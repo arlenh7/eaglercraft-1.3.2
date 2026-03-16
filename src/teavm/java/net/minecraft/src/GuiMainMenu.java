@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Random;
 
 import net.lax1dude.eaglercraft.EagRuntime;
+import net.lax1dude.eaglercraft.profile.GuiScreenEditProfile;
 import net.lax1dude.eaglercraft.opengl.EaglercraftGPU;
 import net.lax1dude.eaglercraft.opengl.ImageData;
 import net.minecraft.client.Minecraft;
@@ -187,15 +188,8 @@ public class GuiMainMenu extends GuiScreen
 
         this.controlList.add(new GuiButton(3, this.width / 2 - 100, var4 + 48, var2.translateKey("menu.mods")));
 
-        if (this.mc.hideQuitButton)
-        {
-            this.controlList.add(new GuiButton(0, this.width / 2 - 100, var4 + 72, var2.translateKey("menu.options")));
-        }
-        else
-        {
-            this.controlList.add(new GuiButton(0, this.width / 2 - 100, var4 + 72 + 12, 98, 20, var2.translateKey("menu.options")));
-            this.controlList.add(new GuiButton(4, this.width / 2 + 2, var4 + 72 + 12, 98, 20, var2.translateKey("menu.quit")));
-        }
+        this.controlList.add(new GuiButton(0, this.width / 2 - 100, var4 + 72 + 12, 98, 20, var2.translateKey("menu.options")));
+        this.controlList.add(new GuiButton(4, this.width / 2 + 2, var4 + 72 + 12, 98, 20, "Edit Profile"));
 
         this.controlList.add(new GuiButtonLanguage(5, this.width / 2 - 124, var4 + 72 + 12));
 
@@ -258,6 +252,11 @@ public class GuiMainMenu extends GuiScreen
         {
             this.showReadme = true;
         }
+
+        if (EagRuntime.getStorage("profileSeen") == null)
+        {
+            this.mc.displayGuiScreen(new GuiScreenEditProfile(this));
+        }
     }
 
     private void func_73969_a(int par1, int par2, StringTranslate par3StringTranslate)
@@ -311,7 +310,7 @@ public class GuiMainMenu extends GuiScreen
 
         if (par1GuiButton.id == 4)
         {
-            this.mc.shutdown();
+            this.mc.displayGuiScreen(new GuiScreenEditProfile(this));
         }
 
         if (par1GuiButton.id == 11)

@@ -21,6 +21,10 @@ public class Tessellator {
 	private float normalY;
 	private float normalZ;
 	
+	private int lightmapU;
+	private int lightmapV;
+	private boolean explicitLightmap = false;
+	
 	private double xOffset;
 	private double yOffset;
 	private double zOffset;
@@ -43,6 +47,28 @@ public class Tessellator {
 	}
 
 	public void startDrawing(int var1) {
+		// Lock a consistent vertex format for the entire draw call
+		this.format.reset();
+		this.format.setTex();
+		this.format.setColor();
+		this.format.setNormal();
+		this.format.setLightmap();
+		this.format.updateVertexFormat();
+
+		// Default attribute values to avoid uninitialized data
+		this.textureU = 0.0D;
+		this.textureV = 0.0D;
+		this.colorR = 255;
+		this.colorG = 255;
+		this.colorB = 255;
+		this.colorA = 255;
+		this.normalX = 0.0F;
+		this.normalY = 0.0F;
+		this.normalZ = 1.0F;
+		this.lightmapU = 0;
+		this.lightmapV = 0;
+		this.explicitLightmap = false;
+
 		this.worldRenderer.begin(var1, format);
 	}
 
@@ -74,6 +100,12 @@ public class Tessellator {
 		}
 	}
 
+	public void setBrightness(int brightness) {
+		this.lightmapU = brightness & 65535;
+		this.lightmapV = brightness >>> 16;
+		this.explicitLightmap = true;
+	}
+
 	public void addVertexWithUV(double var1, double var3, double var5, double var7, double var9) {
 		this.setTextureUV(var7, var9);
 		this.addVertex(var1, var3, var5);
@@ -98,6 +130,15 @@ public class Tessellator {
 		
 		if(format.attribNormalEnabled) {
 			worldRenderer.normal(this.normalX, this.normalY, this.normalZ);
+		}
+		
+		if(format.attribLightmapEnabled) {
+			if(!explicitLightmap) {
+				// Fall back to the current lightmap coords set via OpenGlHelper
+				this.lightmapU = (int)net.minecraft.src.OpenGlHelper.lastLightmapX;
+				this.lightmapV = (int)net.minecraft.src.OpenGlHelper.lastLightmapY;
+			}
+			worldRenderer.lightmap(this.lightmapU, this.lightmapV);
 		}
 		
 		worldRenderer.endVertex();

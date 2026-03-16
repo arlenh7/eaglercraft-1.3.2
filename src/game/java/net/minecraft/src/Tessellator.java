@@ -79,6 +79,7 @@ public class Tessellator {
 	}
 
 	public void setBrightness(int brightness) {
+		delegate.setBrightness(brightness);
 	}
 
 }

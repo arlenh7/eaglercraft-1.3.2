@@ -17,6 +17,10 @@ public class OpenGlHelper
      */
     public static int lightmapTexUnit;
 
+    /** Last lightmap texture coords set via setLightmapTextureCoords */
+    public static float lastLightmapX = 0.0F;
+    public static float lastLightmapY = 0.0F;
+
     /**
      * True if the renderer supports multitextures and the OpenGL version != 1.3
      */
@@ -55,5 +59,10 @@ public class OpenGlHelper
     {
         GlStateManager.setActiveTexture(par0);
         GlStateManager.texCoords2D(par1, par2);
+        if (par0 == lightmapTexUnit)
+        {
+            lastLightmapX = par1;
+            lastLightmapY = par2;
+        }
     }
 }

@@ -251,6 +251,20 @@ public class WorldRenderer {
 	}
 
 	/**
+	 * sets lightmap coords of current vertex
+	 */
+	public WorldRenderer lightmap(int parInt1, int parInt2) {
+		if (this.needsUpdate) {
+			return this;
+		}
+		VertexFormat fmt = this.vertexFormat;
+		int i = this.vertexCount * fmt.attribStride + fmt.attribLightmapOffset;
+		this.byteBuffer.putShort(i, (short) parInt1);
+		this.byteBuffer.putShort(i + 2, (short) parInt2);
+		return this;
+	}
+
+	/**
 	 * translates the last 4 verticies to the given position plus current offset
 	 */
 	public void putPosition(double x, double y, double z) {
