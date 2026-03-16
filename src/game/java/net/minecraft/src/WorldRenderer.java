@@ -181,7 +181,7 @@ public class WorldRenderer
                                         GL11.glTranslatef(8.0F, 8.0F, 8.0F);
                                         tessellator.setRenderingChunk(true);
                                         tessellator.startDrawingQuads();
-                                        tessellator.setTranslation((double)(-this.posX), (double)(-this.posY), (double)(-this.posZ));
+                                        tessellator.setTranslation((double)(-this.posXMinus), (double)(-this.posYMinus), (double)(-this.posZMinus));
                                     }
 
                                     Block var23 = Block.blocksList[var18];

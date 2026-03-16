@@ -1611,6 +1611,12 @@ public class Minecraft implements Runnable, IPlayerUsage
             if (this.renderGlobal != null)
             {
                 this.renderGlobal.setWorldAndLoadRenderers(par1WorldClient);
+
+                if (this.isSingleplayer() && this.loadingScreen != null)
+                {
+                    this.renderGlobal.rebuildAllRenderers(this.loadingScreen);
+                    this.loadingScreen.onNoMoreProgress();
+                }
             }
 
             if (this.effectRenderer != null)

@@ -16,6 +16,9 @@ import org.lwjgl.opengl.GL11;
 public class RenderGlobal implements IWorldAccess
 {
     private static final boolean DISABLE_TERRAIN_LIGHTMAP = true;
+    // Limit chunk rebuild work per frame to keep FPS stable on WebGL
+    private static final int MAX_NEAR_CHUNK_UPDATES_PER_CALL = 2;
+    private static final int MAX_FAR_CHUNK_UPDATES_PER_CALL = 2;
 
     public List tileEntities = new ArrayList();
     private WorldClient theWorld;
@@ -385,6 +388,55 @@ public class RenderGlobal implements IWorldAccess
 
             this.renderEntitiesStartupCounter = 2;
         }
+    }
+
+    /**
+     * Fully rebuild all chunk renderers (used during world load).
+     */
+    public void rebuildAllRenderers(IProgressUpdate progress)
+    {
+        if (this.theWorld == null || this.worldRenderers == null)
+        {
+            return;
+        }
+
+        if (progress != null)
+        {
+            progress.displayProgressMessage("Building terrain");
+            progress.resetProgresAndWorkingMessage("Rendering chunks");
+        }
+
+        int total = this.worldRenderers.length;
+        int lastPct = -1;
+
+        for (int i = 0; i < total; ++i)
+        {
+            WorldRenderer wr = this.worldRenderers[i];
+
+            if (wr != null)
+            {
+                wr.updateRenderer();
+                wr.needsUpdate = false;
+            }
+
+            if (progress != null)
+            {
+                int pct = (int)((i + 1L) * 100L / (long)total);
+
+                if (pct != lastPct && ((i & 7) == 0 || pct == 100))
+                {
+                    lastPct = pct;
+                    progress.setLoadingProgress(pct);
+                }
+            }
+        }
+
+        if (progress != null)
+        {
+            progress.setLoadingProgress(100);
+        }
+
+        this.worldRenderersToUpdate.clear();
     }
 
 
@@ -1367,12 +1419,13 @@ public class RenderGlobal implements IWorldAccess
      */
     public boolean updateRenderers(EntityLiving par1EntityLiving, boolean par2)
     {
-        byte var3 = 2;
+        int var3 = MAX_FAR_CHUNK_UPDATES_PER_CALL;
         RenderSorter var4 = new RenderSorter(par1EntityLiving);
         WorldRenderer[] var5 = new WorldRenderer[var3];
         ArrayList var6 = null;
         int var7 = this.worldRenderersToUpdate.size();
         int var8 = 0;
+        int nearUpdates = 0;
         this.theWorld.theProfiler.startSection("nearChunksSearch");
         int var9;
         WorldRenderer var10;
@@ -1418,7 +1471,8 @@ public class RenderGlobal implements IWorldAccess
                         continue;
                     }
                 }
-                else if (!var10.isInFrustum)
+
+                if (!var10.isInFrustum)
                 {
                     continue;
                 }
@@ -1447,8 +1501,16 @@ public class RenderGlobal implements IWorldAccess
             for (var9 = var6.size() - 1; var9 >= 0; --var9)
             {
                 var10 = (WorldRenderer)var6.get(var9);
-                var10.updateRenderer();
-                var10.needsUpdate = false;
+                if (nearUpdates < MAX_NEAR_CHUNK_UPDATES_PER_CALL)
+                {
+                    var10.updateRenderer();
+                    var10.needsUpdate = false;
+                    ++nearUpdates;
+                }
+                else
+                {
+                    this.worldRenderersToUpdate.add(var10);
+                }
             }
         }
 
@@ -1519,7 +1581,8 @@ public class RenderGlobal implements IWorldAccess
             if (var16 < var11)
             {
                 this.theWorld.theProfiler.endSection();
-                return var7 == var8 + var9;
+                // Limit work per frame; update loop should only run once per frame
+                return true;
             }
 
             this.worldRenderersToUpdate.remove(var16);
