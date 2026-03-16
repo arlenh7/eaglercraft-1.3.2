@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import net.minecraft.client.Minecraft;
+import net.lax1dude.eaglercraft.EagRuntime;
+import net.lax1dude.eaglercraft.internal.EnumPlatformType;
 import net.lax1dude.eaglercraft.internal.buffer.IntBuffer;
 import org.lwjgl.opengl.ARBOcclusionQuery;
 import org.lwjgl.opengl.GL11;
@@ -17,8 +19,13 @@ public class RenderGlobal implements IWorldAccess
 {
     private static final boolean DISABLE_TERRAIN_LIGHTMAP = true;
     // Limit chunk rebuild work per frame to keep FPS stable on WebGL
-    private static final int MAX_NEAR_CHUNK_UPDATES_PER_CALL = 2;
-    private static final int MAX_FAR_CHUNK_UPDATES_PER_CALL = 2;
+    private static final int MAX_NEAR_CHUNK_UPDATES_PER_CALL = 1;
+    private static final int MAX_FAR_CHUNK_UPDATES_PER_CALL = 1;
+    // Clamp render distance for web targets to keep chunk count manageable
+    // Note: renderDistance uses 0=far, 1=normal, 2=short, 3=tiny
+    private static final int MIN_RENDER_DISTANCE_WEB = 1; // cap to at least "normal" (17x17)
+    // Reduce background dirty checks per frame
+    private static final int MAX_DIRTY_RENDERERS_CHECK = 4;
 
     public List tileEntities = new ArrayList();
     private WorldClient theWorld;
@@ -160,6 +167,11 @@ public class RenderGlobal implements IWorldAccess
         byte var4 = 32;
         this.glRenderListBase = GLAllocation.generateDisplayLists(var3 * var3 * var4 * 3);
         this.occlusionEnabled = OpenGlCapsChecker.checkARBOcclusion();
+        if (EagRuntime.getPlatformType() != EnumPlatformType.DESKTOP)
+        {
+            // Occlusion queries are expensive on WebGL/WASM and often hurt more than help
+            this.occlusionEnabled = false;
+        }
 
         if (this.occlusionEnabled)
         {
@@ -304,7 +316,27 @@ public class RenderGlobal implements IWorldAccess
         if (this.theWorld != null)
         {
             Block.leaves.setGraphicsLevel(this.mc.gameSettings.fancyGraphics);
-            this.renderDistance = this.mc.gameSettings.renderDistance;
+            int desired = this.mc.gameSettings.renderDistance;
+
+            if (desired < 0)
+            {
+                desired = 0;
+            }
+
+            int min = EagRuntime.getPlatformType() == EnumPlatformType.DESKTOP ? 0 : MIN_RENDER_DISTANCE_WEB;
+
+            if (desired < min)
+            {
+                desired = min;
+            }
+
+            if (desired > 3)
+            {
+                desired = 3;
+            }
+
+            this.renderDistance = desired;
+            this.mc.gameSettings.renderDistance = desired;
             int var2;
             int var3;
 
@@ -526,6 +558,36 @@ public class RenderGlobal implements IWorldAccess
         return "E: " + this.countEntitiesRendered + "/" + this.countEntitiesTotal + ". B: " + this.countEntitiesHidden + ", I: " + (this.countEntitiesTotal - this.countEntitiesHidden - this.countEntitiesRendered);
     }
 
+    public int getRenderedChunksCount()
+    {
+        return this.renderersBeingRendered;
+    }
+
+    public int getLoadedChunksCount()
+    {
+        return this.renderersLoaded;
+    }
+
+    public int getRenderedEntitiesCount()
+    {
+        return this.countEntitiesRendered;
+    }
+
+    public int getHiddenEntitiesCount()
+    {
+        return this.countEntitiesHidden;
+    }
+
+    public int getChunkUpdateQueueSize()
+    {
+        return this.worldRenderersToUpdate != null ? this.worldRenderersToUpdate.size() : 0;
+    }
+
+    public int getChunkUpdateLimit()
+    {
+        return MAX_NEAR_CHUNK_UPDATES_PER_CALL + MAX_FAR_CHUNK_UPDATES_PER_CALL;
+    }
+
     /**
      * Goes through all the renderers setting new positions on them and those that have their position changed are
      * adding to be updated
@@ -624,7 +686,7 @@ public class RenderGlobal implements IWorldAccess
     {
         this.theWorld.theProfiler.startSection("sortchunks");
 
-        for (int var5 = 0; var5 < 10; ++var5)
+        for (int var5 = 0; var5 < MAX_DIRTY_RENDERERS_CHECK; ++var5)
         {
             this.worldRenderersCheckIndex = (this.worldRenderersCheckIndex + 1) % this.worldRenderers.length;
             WorldRenderer var6 = this.worldRenderers[this.worldRenderersCheckIndex];
@@ -635,8 +697,28 @@ public class RenderGlobal implements IWorldAccess
             }
         }
 
-        if (this.mc.gameSettings.renderDistance != this.renderDistance)
+        int desired = this.mc.gameSettings.renderDistance;
+
+        if (desired < 0)
         {
+            desired = 0;
+        }
+
+        int min = EagRuntime.getPlatformType() == EnumPlatformType.DESKTOP ? 0 : MIN_RENDER_DISTANCE_WEB;
+
+        if (desired < min)
+        {
+            desired = min;
+        }
+
+        if (desired > 3)
+        {
+            desired = 3;
+        }
+
+        if (desired != this.renderDistance)
+        {
+            this.mc.gameSettings.renderDistance = desired;
             this.loadRenderers();
         }
 

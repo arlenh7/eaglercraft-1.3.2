@@ -143,6 +143,9 @@ public class IndexedDBFilesystem implements IEaglerFilesystem {
 
 	@Override
 	public void eaglerIterate(String pathName, VFSFilenameIterator itr, boolean recursive) {
+		if(pathName == null) {
+			pathName = "";
+		}
 		if(recursive) {
 			AsyncHandlers.iterateFiles(database, pathName, false, itr);
 		}else {
@@ -286,7 +289,9 @@ public class IndexedDBFilesystem implements IEaglerFilesystem {
 			IDBTransaction tx = db.transaction("filesystem", rw ? "readwrite" : "readonly");
 			final IDBCursorRequest r = tx.objectStore("filesystem").openCursor();
 			final int[] res = new int[1];
-			final boolean b = prefix.length() == 0;
+			final String safePrefix = prefix == null ? "" : prefix;
+			final boolean b = safePrefix.length() == 0;
+			final String prefixWithSlash = b ? "" : (safePrefix.endsWith("/") ? safePrefix : (safePrefix + "/"));
 			TeaVMUtils.addEventListener(r, "success", new EventHandler() {
 				@Override
 				public void handleEvent() {
@@ -297,7 +302,7 @@ public class IndexedDBFilesystem implements IEaglerFilesystem {
 					}
 					String k = readKey(c.getKey());
 					if(k != null) {
-						if(b || k.startsWith(prefix)) {
+						if(b || k.equals(safePrefix) || k.startsWith(prefixWithSlash)) {
 							int ci = res[0]++;
 							try {
 								itr.next(k);

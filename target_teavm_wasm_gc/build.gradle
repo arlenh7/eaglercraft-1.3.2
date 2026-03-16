@@ -14,8 +14,26 @@ sourceSets {
             srcDirs(
                 "../src/main/java",
                 "../src/game/java",
+                "../src/teavm/java",
                 "../src/wasm-gc-teavm/java"
             )
+            def teavmRoot = file("../src/teavm/java").toPath()
+            def gameRoot = file("../src/game/java").toPath()
+            def mainRoot = file("../src/main/java").toPath()
+            exclude { details ->
+                def p = details.file.toPath()
+                if (p.startsWith(gameRoot)) {
+                    def rel = gameRoot.relativize(p)
+                    def alt = teavmRoot.resolve(rel).toFile()
+                    return alt.exists()
+                }
+                if (p.startsWith(mainRoot)) {
+                    def rel = mainRoot.relativize(p)
+                    def alt = teavmRoot.resolve(rel).toFile()
+                    return alt.exists()
+                }
+                return false
+            }
         }
     }
     

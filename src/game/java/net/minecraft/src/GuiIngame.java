@@ -27,6 +27,9 @@ public class GuiIngame extends Gui
 
     /** Previous frame vignette brightness (slowly changes by 1% each frame) */
     public float prevVignetteBrightness = 1.0F;
+    private long fpsLastUpdate = 0L;
+    private int fpsCounter = 0;
+    private int fpsValue = 0;
 
     public GuiIngame(Minecraft par1Minecraft)
     {
@@ -384,6 +387,37 @@ public class GuiIngame extends Gui
             var12 = var8.getStringWidth(var36);
             var8.drawStringWithShadow(var36, var6 - var12 - 10, 5, 16777215);
             this.mc.mcProfiler.endSection();
+        }
+
+        if (!this.mc.gameSettings.hideGUI && !this.mc.gameSettings.showDebugInfo && this.mc.theWorld != null && this.mc.thePlayer != null && this.mc.currentScreen == null)
+        {
+            long now = EagRuntime.steadyTimeMillis();
+            if (this.fpsLastUpdate == 0L)
+            {
+                this.fpsLastUpdate = now;
+            }
+
+            ++this.fpsCounter;
+            long elapsed = now - this.fpsLastUpdate;
+            if (elapsed >= 1000L)
+            {
+                this.fpsValue = (int)(this.fpsCounter * 1000L / elapsed);
+                this.fpsCounter = 0;
+                this.fpsLastUpdate = now;
+            }
+
+            RenderGlobal rg = this.mc.renderGlobal;
+            int cRendered = rg != null ? rg.getRenderedChunksCount() : 0;
+            int cLoaded = rg != null ? rg.getLoadedChunksCount() : 0;
+            int eRendered = rg != null ? rg.getRenderedEntitiesCount() : 0;
+            int eHidden = rg != null ? rg.getHiddenEntitiesCount() : 0;
+            int uq = rg != null ? rg.getChunkUpdateQueueSize() : 0;
+            int uqMax = rg != null ? rg.getChunkUpdateLimit() : 0;
+
+            String line1 = "FPS: " + this.fpsValue + " | C: " + cRendered + "/" + cLoaded + ", E: " + eRendered + "+" + eHidden + ", Uq: " + uq + "/" + uqMax;
+            String line2 = "x: " + MathHelper.floor_double(this.mc.thePlayer.posX) + ", y: " + MathHelper.floor_double(this.mc.thePlayer.posY) + ", z: " + MathHelper.floor_double(this.mc.thePlayer.posZ);
+            var8.drawStringWithShadow(line1, 2, 2, 16777215);
+            var8.drawStringWithShadow(line2, 2, 12, 16777215);
         }
 
         if (this.mc.gameSettings.showDebugInfo)

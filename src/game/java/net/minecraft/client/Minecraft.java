@@ -8,8 +8,10 @@ import java.util.List;
 
 
 import net.lax1dude.eaglercraft.EagRuntime;
+import net.lax1dude.eaglercraft.EagUtils;
 import net.lax1dude.eaglercraft.beta.TextureNewClockFX;
 import net.lax1dude.eaglercraft.beta.TextureNewCompassFX;
+import net.lax1dude.eaglercraft.internal.EnumPlatformType;
 import net.lax1dude.eaglercraft.internal.PlatformApplication;
 import net.lax1dude.eaglercraft.internal.PlatformOpenGL;
 import net.lax1dude.eaglercraft.internal.buffer.ByteBuffer;
@@ -242,6 +244,7 @@ public class Minecraft implements Runnable, IPlayerUsage
      * Does the actual gameplay have focus. If so then mouse and keys will effect the player instead of menus.
      */
     public boolean inGameHasFocus = false;
+    private boolean wasPointerLocked = false;
     long systemTime = getSystemTime();
 
     /** Join player counter */
@@ -285,6 +288,12 @@ public class Minecraft implements Runnable, IPlayerUsage
 
     private void startTimerHackThread()
     {
+        if (EagRuntime.getPlatformType() == EnumPlatformType.WASM_GC)
+        {
+            // WASM-GC does not support Thread.start()
+            return;
+        }
+
         ThreadClientSleep var1 = new ThreadClientSleep(this, "Timer hack thread");
         var1.setDaemon(true);
         var1.start();
@@ -1102,6 +1111,24 @@ public class Minecraft implements Runnable, IPlayerUsage
      */
     public void runTick()
     {
+        if (this.integratedServerIsRunning && this.theIntegratedServer != null && EagRuntime.getPlatformType() == EnumPlatformType.WASM_GC)
+        {
+            if (!this.isGamePaused)
+            {
+                this.theIntegratedServer.tick();
+            }
+        }
+
+        boolean pointerLocked = Mouse.isActuallyGrabbed();
+        if (this.currentScreen == null && this.inGameHasFocus && this.theWorld != null)
+        {
+            if (this.wasPointerLocked && !pointerLocked)
+            {
+                this.displayInGameMenu();
+            }
+        }
+        this.wasPointerLocked = pointerLocked;
+
         if (this.rightClickDelayTimer > 0)
         {
             --this.rightClickDelayTimer;
@@ -1523,14 +1550,7 @@ public class Minecraft implements Runnable, IPlayerUsage
                 this.loadingScreen.resetProgresAndWorkingMessage("");
             }
 
-            try
-            {
-                Thread.sleep(200L);
-            }
-            catch (InterruptedException var9)
-            {
-                ;
-            }
+            EagUtils.sleep(200L);
         }
 
         this.displayGuiScreen((GuiScreen)null);

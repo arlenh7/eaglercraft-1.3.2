@@ -10,6 +10,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import net.lax1dude.eaglercraft.EagRuntime;
+import net.lax1dude.eaglercraft.internal.EnumPlatformType;
 import net.minecraft.src.AnvilSaveConverter;
 import net.minecraft.src.AxisAlignedBB;
 import net.minecraft.src.CallableIsServerModded;
@@ -653,6 +655,28 @@ public abstract class MinecraftServer implements Runnable, IPlayerUsage, IComman
 
     public void startServerThread()
     {
+        if (EagRuntime.getPlatformType() == EnumPlatformType.WASM_GC)
+        {
+            try
+            {
+                if (this.startServer())
+                {
+                    this.serverIsRunning = true;
+                }
+                else
+                {
+                    this.finalTick((CrashReport)null);
+                }
+            }
+            catch (Throwable t)
+            {
+                t.printStackTrace();
+                this.finalTick(new CrashReport("Exception starting server", t));
+            }
+
+            return;
+        }
+
         (new ThreadServerApplication(this, "Server thread")).start();
     }
 

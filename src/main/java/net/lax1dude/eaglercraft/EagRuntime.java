@@ -370,4 +370,8 @@ public class EagRuntime {
 		PlatformRuntime.immediateContinue();
 	}
 
+	public static boolean immediateContinueSupported() {
+		return PlatformRuntime.immediateContinueSupported();
+	}
+
 }

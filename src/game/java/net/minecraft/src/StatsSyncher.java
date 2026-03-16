@@ -7,6 +7,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Map;
+import net.lax1dude.eaglercraft.EagUtils;
 
 public class StatsSyncher
 {
@@ -202,14 +203,7 @@ public class StatsSyncher
                 break;
             }
 
-            try
-            {
-                Thread.sleep(100L);
-            }
-            catch (InterruptedException var10)
-            {
-                var10.printStackTrace();
-            }
+            EagUtils.sleep(100L);
         }
 
         this.isBusy = true;

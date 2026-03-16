@@ -1,10 +1,10 @@
 package net.minecraft.src;
 
-import java.lang.management.ManagementFactory;
-import java.lang.management.RuntimeMXBean;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Callable;
+import net.lax1dude.eaglercraft.EagRuntime;
+import net.lax1dude.eaglercraft.internal.EnumPlatformType;
 
 class CallableJVMFlags implements Callable
 {
@@ -18,28 +18,41 @@ class CallableJVMFlags implements Callable
 
     public String func_71487_a()
     {
-        RuntimeMXBean var1 = ManagementFactory.getRuntimeMXBean();
-        List var2 = var1.getInputArguments();
-        int var3 = 0;
-        StringBuilder var4 = new StringBuilder();
-        Iterator var5 = var2.iterator();
-
-        while (var5.hasNext())
+        if (EagRuntime.getPlatformType() == EnumPlatformType.WASM_GC)
         {
-            String var6 = (String)var5.next();
-
-            if (var6.startsWith("-X"))
-            {
-                if (var3++ > 0)
-                {
-                    var4.append(" ");
-                }
-
-                var4.append(var6);
-            }
+            return "0 total; (not available)";
         }
 
-        return String.format("%d total; %s", new Object[] {Integer.valueOf(var3), var4.toString()});
+        try
+        {
+            Class<?> mf = Class.forName("java.lang.management.ManagementFactory");
+            Object runtime = mf.getMethod("getRuntimeMXBean").invoke(null);
+            List var2 = (List)runtime.getClass().getMethod("getInputArguments").invoke(runtime);
+            int var3 = 0;
+            StringBuilder var4 = new StringBuilder();
+            Iterator var5 = var2.iterator();
+
+            while (var5.hasNext())
+            {
+                String var6 = (String)var5.next();
+
+                if (var6.startsWith("-X"))
+                {
+                    if (var3++ > 0)
+                    {
+                        var4.append(" ");
+                    }
+
+                    var4.append(var6);
+                }
+            }
+
+            return String.format("%d total; %s", new Object[] {Integer.valueOf(var3), var4.toString()});
+        }
+        catch (Throwable t)
+        {
+            return "0 total; (not available)";
+        }
     }
 
     public Object call()

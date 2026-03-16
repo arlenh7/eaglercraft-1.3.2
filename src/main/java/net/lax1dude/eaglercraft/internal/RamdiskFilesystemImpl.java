@@ -111,13 +111,17 @@ public class RamdiskFilesystemImpl implements IEaglerFilesystem {
 
 	@Override
 	public void eaglerIterate(String pathName, VFSFilenameIterator itr, boolean recursive) {
+		if (pathName == null) {
+			pathName = "";
+		}
 		if (!recursive) {
 			eaglerIterate(pathName, new VFSFilenameIteratorNonRecursive(itr,
 					VFSFilenameIteratorNonRecursive.countSlashes(pathName) + 1), true);
 		} else {
 			boolean b = pathName.length() == 0;
+			String prefix = b ? "" : (pathName.endsWith("/") ? pathName : (pathName + "/"));
 			for (String key : filesystemMap.keySet()) {
-				if (b || key.startsWith(pathName)) {
+				if (b || key.equals(pathName) || key.startsWith(prefix)) {
 					itr.next(key);
 				}
 			}

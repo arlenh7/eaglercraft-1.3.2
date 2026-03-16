@@ -1,6 +1,7 @@
 package net.minecraft.src;
 
 import net.minecraft.client.Minecraft;
+import net.lax1dude.eaglercraft.EagRuntime;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.GL11;
 
@@ -160,13 +161,9 @@ public class LoadingScreenRenderer implements IProgressUpdate
                 this.mc.fontRenderer.drawStringWithShadow(this.field_73727_a, (var5 - this.mc.fontRenderer.getStringWidth(this.field_73727_a)) / 2, var6 / 2 - 4 + 8, 16777215);
                 Display.update();
 
-                try
+                if (EagRuntime.immediateContinueSupported())
                 {
-                    Thread.yield();
-                }
-                catch (Exception var14)
-                {
-                    ;
+                    EagRuntime.immediateContinue();
                 }
             }
         }

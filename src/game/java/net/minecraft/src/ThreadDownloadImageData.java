@@ -23,6 +23,7 @@ public class ThreadDownloadImageData
 
     public ThreadDownloadImageData(String par1Str, ImageBuffer par2ImageBuffer)
     {
-        (new ThreadDownloadImage(this, par1Str, par2ImageBuffer)).start();
+        // PlatformRuntime download is already async; no need to spawn a Thread
+        (new ThreadDownloadImage(this, par1Str, par2ImageBuffer)).run();
     }
 }
