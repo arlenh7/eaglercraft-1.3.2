@@ -10,10 +10,13 @@ import java.util.Date;
 import java.util.Random;
 
 import net.lax1dude.eaglercraft.EagRuntime;
+import net.lax1dude.eaglercraft.minecraft.EaglerFontRenderer;
 import net.lax1dude.eaglercraft.profile.GuiScreenEditProfile;
 import net.lax1dude.eaglercraft.opengl.EaglercraftGPU;
 import net.lax1dude.eaglercraft.opengl.ImageData;
 import net.minecraft.client.Minecraft;
+import net.peyton.eagler.minecraft.FontRenderer;
+
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
@@ -569,7 +572,8 @@ public class GuiMainMenu extends GuiScreen
             var9 = var9 + " Demo";
         }
 
-        this.drawString(this.fontRenderer, var9, 2, this.height - 10, 16777215);
+        this.drawString(this.fontRenderer, var9, 2, this.height - 20, 16777215);
+        this.drawString(this.fontRenderer, "Eaglercraft 1.3.2 u0 [" + EagRuntime.getPlatformType() + "]", 2, this.height - 10, 16777215);
         String var10 = "Copyright Mojang AB. Do not distribute!";
         this.drawString(this.fontRenderer, var10, this.width - this.fontRenderer.getStringWidth(var10) - 2, this.height - 10, 16777215);
 

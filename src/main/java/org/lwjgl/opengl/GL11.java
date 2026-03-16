@@ -202,8 +202,11 @@ public class GL11 extends RealOpenGLEnums {
 	}
 
 	public static void glCallLists(IntBuffer p1) {
-		while (p1.hasRemaining()) {
-			glCallList(p1.get());
+		// Don't advance the buffer position; RenderList expects this buffer to be reusable
+		int pos = p1.position();
+		int lim = p1.limit();
+		for (int i = pos; i < lim; ++i) {
+			glCallList(p1.get(i));
 		}
 	}
 
