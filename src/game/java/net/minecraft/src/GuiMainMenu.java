@@ -47,6 +47,7 @@ public class GuiMainMenu extends GuiScreen
     public boolean showReadme = false;
     private int mousex = 0;
     private int mousey = 0;
+    private GuiButton readmeButton;
 
     public GuiMainMenu()
     {
@@ -226,6 +227,8 @@ public class GuiMainMenu extends GuiScreen
         }
 
         this.controlList.add(new GuiButtonLanguage(5, this.width / 2 - 124, var4 + 72 + 12));
+        this.readmeButton = new GuiButton(6, this.width - 72, 2, 70, 12, "readme.txt");
+        this.controlList.add(this.readmeButton);
 
         if (this.readmeLines.isEmpty())
         {
@@ -342,6 +345,11 @@ public class GuiMainMenu extends GuiScreen
                 GuiYesNo var4 = GuiSelectWorld.func_74061_a(this, var3.getWorldName(), 12);
                 this.mc.displayGuiScreen(var4);
             }
+        }
+
+        if (par1GuiButton.id == 6)
+        {
+            this.showReadme = true;
         }
     }
 
@@ -566,22 +574,6 @@ public class GuiMainMenu extends GuiScreen
         String var10 = "Copyright Mojang AB. Do not distribute!";
         this.drawString(this.fontRenderer, var10, this.width - this.fontRenderer.getStringWidth(var10) - 2, this.height - 10, 16777215);
 
-        String readmeText = "readme.txt";
-        int w = this.fontRenderer.getStringWidth(readmeText) * 3 / 4;
-        if (!this.showReadme && par1 >= (this.width - w - 4) && par1 <= this.width && par2 >= 0 && par2 <= 9)
-        {
-            drawRect((this.width - w - 4), 0, this.width, 9, 0x55000099);
-        }
-        else
-        {
-            drawRect((this.width - w - 4), 0, this.width, 9, 0x55200000);
-        }
-        GL11.glPushMatrix();
-        GL11.glTranslatef((this.width - w - 2), 1.0f, 0.0f);
-        GL11.glScalef(0.75f, 0.75f, 0.75f);
-        this.drawString(this.fontRenderer, readmeText, 0, 0, 16777215);
-        GL11.glPopMatrix();
-
         if (this.showReadme)
         {
             super.drawScreen(0, 0, par3);
@@ -630,21 +622,7 @@ public class GuiMainMenu extends GuiScreen
 
     protected void mouseClicked(int par1, int par2, int par3)
     {
-        if (!this.showReadme)
-        {
-            super.mouseClicked(par1, par2, par3);
-            if (par3 == 0)
-            {
-                String readmeText = "readme.txt";
-                int w = this.fontRenderer.getStringWidth(readmeText) * 3 / 4;
-                if (par1 >= (this.width - w - 4) && par1 <= this.width && par2 >= 0 && par2 <= 9)
-                {
-                    this.showReadme = true;
-                    return;
-                }
-            }
-        }
-        else
+        if (this.showReadme)
         {
             if (par3 == 0)
             {
@@ -675,5 +653,10 @@ public class GuiMainMenu extends GuiScreen
                 }
             }
         }
+        else
+        {
+            super.mouseClicked(par1, par2, par3);
+        }
+
     }
 }

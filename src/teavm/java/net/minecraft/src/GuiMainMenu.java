@@ -3,12 +3,14 @@ package net.minecraft.src;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.List;
 import java.util.Random;
 
 import net.lax1dude.eaglercraft.EagRuntime;
 import net.lax1dude.eaglercraft.opengl.EaglercraftGPU;
 import net.lax1dude.eaglercraft.opengl.ImageData;
 import net.minecraft.client.Minecraft;
+import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
 import org.lwjgl.util.glu.GLU;
@@ -33,6 +35,14 @@ public class GuiMainMenu extends GuiScreen
      */
     private int viewportTexture;
     private static final String[] field_73978_o = new String[] {"/title/bg/panorama0.png", "/title/bg/panorama1.png", "/title/bg/panorama2.png", "/title/bg/panorama3.png", "/title/bg/panorama4.png", "/title/bg/panorama5.png"};
+    private int scrollPosition = 0;
+    private static final int visibleLines = 21;
+    private int dragstart = -1;
+    private int dragstartI = -1;
+    private ArrayList<String> readmeLines = new ArrayList();
+    public boolean showReadme = false;
+    private int mousex = 0;
+    private int mousey = 0;
 
     public GuiMainMenu()
     {
@@ -86,6 +96,36 @@ public class GuiMainMenu extends GuiScreen
     public void updateScreen()
     {
         ++this.panoramaTimer;
+
+        if (this.showReadme)
+        {
+            if (Mouse.isButtonDown(0) && this.dragstart > 0)
+            {
+                int trackHeight = 193;
+                int lines = this.readmeLines.size();
+                if (lines < 1)
+                {
+                    lines = 1;
+                }
+                this.scrollPosition = (this.mousey - this.dragstart) * lines / trackHeight + this.dragstartI;
+                if (this.scrollPosition < 0)
+                {
+                    this.scrollPosition = 0;
+                }
+            if (this.scrollPosition + visibleLines > lines)
+            {
+                this.scrollPosition = lines - visibleLines;
+            }
+            if (this.scrollPosition < 0)
+            {
+                this.scrollPosition = 0;
+            }
+        }
+            else
+            {
+                this.dragstart = -1;
+            }
+        }
     }
 
     /**
@@ -99,7 +139,13 @@ public class GuiMainMenu extends GuiScreen
     /**
      * Fired when a key is typed. This is the equivalent of KeyListener.keyTyped(KeyEvent e).
      */
-    protected void keyTyped(char par1, int par2) {}
+    protected void keyTyped(char par1, int par2)
+    {
+        if (this.showReadme && par2 == 1)
+        {
+            this.hideReadme();
+        }
+    }
 
     /**
      * Adds the buttons (and other controls) to the screen in question.
@@ -152,6 +198,66 @@ public class GuiMainMenu extends GuiScreen
         }
 
         this.controlList.add(new GuiButtonLanguage(5, this.width / 2 - 124, var4 + 72 + 12));
+
+        if (this.readmeLines.isEmpty())
+        {
+            int width = 315;
+            List<String> lines = EagRuntime.getResourceLines("/assets/eagler/readme.txt");
+            if (lines == null)
+            {
+                lines = EagRuntime.getResourceLines("assets/eagler/readme.txt");
+            }
+
+            if (lines == null)
+            {
+                for (int i = 0; i < 30; ++i)
+                {
+                    this.readmeLines.add(" -- file not found -- ");
+                }
+            }
+            else
+            {
+                for (int i = 0, l = lines.size(); i < l; ++i)
+                {
+                    String s = lines.get(i);
+                    if (s == null)
+                    {
+                        continue;
+                    }
+
+                    String s2 = s.trim();
+                    if (s2.length() == 0)
+                    {
+                        this.readmeLines.add("");
+                    }
+                    else
+                    {
+                        String[] words = s2.split(" ");
+                        String currentLine = "   ";
+                        for (int j = 0; j < words.length; ++j)
+                        {
+                            String s3 = words[j];
+                            String cCurrentLine = currentLine + s3 + " ";
+                            if (this.fontRenderer.getStringWidth(cCurrentLine) < width)
+                            {
+                                currentLine = cCurrentLine;
+                            }
+                            else
+                            {
+                                this.readmeLines.add(currentLine);
+                                currentLine = s3 + " ";
+                            }
+                        }
+                        this.readmeLines.add(currentLine);
+                    }
+                }
+            }
+        }
+
+        if (EagRuntime.getStorage("readmeSeen") == null)
+        {
+            this.showReadme = true;
+        }
     }
 
     private void func_73969_a(int par1, int par2, StringTranslate par3StringTranslate)
@@ -223,6 +329,69 @@ public class GuiMainMenu extends GuiScreen
                 GuiYesNo var4 = GuiSelectWorld.func_74061_a(this, var3.getWorldName(), 12);
                 this.mc.displayGuiScreen(var4);
             }
+        }
+    }
+
+    public void handleMouseInput()
+    {
+        super.handleMouseInput();
+
+        if (this.showReadme)
+        {
+            int var1 = Mouse.getEventDWheel();
+            if (var1 < 0)
+            {
+                this.scrollPosition += 3;
+            }
+            if (var1 > 0)
+            {
+                this.scrollPosition -= 3;
+            }
+        }
+    }
+
+    protected void mouseClicked(int par1, int par2, int par3)
+    {
+        if (this.showReadme)
+        {
+            if (par3 == 0)
+            {
+                int x = (this.width - 345) / 2;
+                int y = (this.height - 230) / 2;
+
+                if (par1 >= (x + 323) && par1 <= (x + 336) && par2 >= (y + 7) && par2 <= (y + 20))
+                {
+                    this.mc.sndManager.playSoundFX("random.click", 1.0F, 1.0F);
+                    this.hideReadme();
+                    return;
+                }
+
+                int trackHeight = 193;
+                int lines = this.readmeLines.size();
+                if (lines < 1)
+                {
+                    lines = 1;
+                }
+                int offset = trackHeight * this.scrollPosition / lines;
+                int scrollHeight = (visibleLines * trackHeight / lines) + 1;
+
+                if (par1 >= (x + 326) && par1 <= (x + 334) && par2 >= (y + 27 + offset) && par2 <= (y + 27 + offset + scrollHeight))
+                {
+                    this.dragstart = par2;
+                    this.dragstartI = this.scrollPosition;
+                }
+            }
+        }
+        else
+        {
+            if (par3 == 0 && this.isReadmeHover(par1, par2))
+            {
+                this.showReadme = true;
+                this.scrollPosition = 0;
+                this.mc.sndManager.playSoundFX("random.click", 1.0F, 1.0F);
+                return;
+            }
+            super.mouseClicked(par1, par2, par3);
         }
     }
 
@@ -396,6 +565,8 @@ public class GuiMainMenu extends GuiScreen
      */
     public void drawScreen(int par1, int par2, float par3)
     {
+        this.mousex = par1;
+        this.mousey = par2;
         this.renderSkybox(par1, par2, par3);
         Tessellator var4 = Tessellator.instance;
         short var5 = 274;
@@ -439,6 +610,104 @@ public class GuiMainMenu extends GuiScreen
         this.drawString(this.fontRenderer, var9, 2, this.height - 10, 16777215);
         String var10 = "Copyright Mojang AB. Do not distribute!";
         this.drawString(this.fontRenderer, var10, this.width - this.fontRenderer.getStringWidth(var10) - 2, this.height - 10, 16777215);
-        super.drawScreen(par1, par2, par3);
+
+        // top-right "eaglercraft readme.txt" label (original style)
+        String readmeLabel = "eaglercraft readme.txt";
+        int labelW = this.fontRenderer.getStringWidth(readmeLabel) * 3 / 4;
+        int labelX = this.width - labelW - 4;
+        if (!this.showReadme && this.isReadmeHover(par1, par2))
+        {
+            drawRect(labelX, 0, this.width, 9, 0x55000099);
+        }
+        else
+        {
+            drawRect(labelX, 0, this.width, 9, 0x55200000);
+        }
+        GL11.glPushMatrix();
+        GL11.glTranslatef((float)(this.width - labelW - 2), 1.0F, 0.0F);
+        GL11.glScalef(0.75F, 0.75F, 0.75F);
+        this.drawString(this.fontRenderer, readmeLabel, 0, 0, 16777215);
+        GL11.glPopMatrix();
+
+        if (this.showReadme)
+        {
+            super.drawScreen(0, 0, par3);
+            this.drawGradientRect(0, 0, this.width, this.height, -1072689136, -804253680);
+            int x = (this.width - 345) / 2;
+            int y = (this.height - 230) / 2;
+
+            // rounded panel background (matches original)
+            int bgTex = this.mc.renderEngine.getTexture("/gui/demo_bg.png");
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+            this.mc.renderEngine.bindTexture(bgTex);
+            GL11.glPushMatrix();
+            GL11.glTranslatef((float)x, (float)y, 0.0F);
+            GL11.glScalef(1.39F, 1.39F, 1.39F);
+            this.drawTexturedModalRect(0, 0, 0, 0, 248, 166);
+            GL11.glPopMatrix();
+
+            // red "X" close button (drawn to match original)
+            this.drawRedX(x + 323, y + 7, 13);
+
+            int lines = this.readmeLines.size();
+            if (lines < 1)
+            {
+                lines = 1;
+            }
+            if (this.scrollPosition < 0)
+            {
+                this.scrollPosition = 0;
+            }
+            if (this.scrollPosition + visibleLines > lines)
+            {
+                this.scrollPosition = lines - visibleLines;
+            }
+            if (this.scrollPosition < 0)
+            {
+                this.scrollPosition = 0;
+            }
+
+            for (int i = 0; i < visibleLines && i + this.scrollPosition < lines; ++i)
+            {
+                this.fontRenderer.drawString(this.readmeLines.get(this.scrollPosition + i), x + 10, y + 10 + (i * 10), 0x404060);
+            }
+
+            int trackHeight = 193;
+            int offset = trackHeight * this.scrollPosition / lines;
+            drawRect(x + 326, y + 27, x + 334, y + 220, 0x33000020);
+            drawRect(x + 326, y + 27 + offset, x + 334, y + 27 + (visibleLines * trackHeight / lines) + offset + 1, 0x66000000);
+        }
+        else
+        {
+            super.drawScreen(par1, par2, par3);
+        }
+    }
+
+    private void hideReadme()
+    {
+        this.showReadme = false;
+        if (EagRuntime.getStorage("readmeSeen") == null)
+        {
+            EagRuntime.setStorage("readmeSeen", new byte[] { 1 });
+        }
+    }
+
+    private boolean isReadmeHover(int x, int y)
+    {
+        String readmeLabel = "eaglercraft readme.txt";
+        int labelW = this.fontRenderer.getStringWidth(readmeLabel) * 3 / 4;
+        int labelX = this.width - labelW - 4;
+        return x >= labelX && x <= this.width && y >= 0 && y <= 9;
+    }
+
+    private void drawRedX(int x, int y, int size)
+    {
+        int end = size - 1;
+        int color = 0xFFCC0000;
+        for (int i = 0; i < size; ++i)
+        {
+            drawRect(x + i, y + i, x + i + 1, y + i + 1, color);
+            drawRect(x + i, y + end - i, x + i + 1, y + end - i + 1, color);
+        }
     }
 }

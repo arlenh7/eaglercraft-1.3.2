@@ -260,6 +260,7 @@ public class PlatformInput {
 			public void handleEvent(MouseEvent evt) {
 				evt.preventDefault();
 				evt.stopPropagation();
+				PlatformAudio.resumeContext();
 				handleWindowFocus();
 				if (tryGrabCursorHook())
 					return;
@@ -338,6 +339,7 @@ public class PlatformInput {
 					evt.preventDefault();
 					evt.stopPropagation();
 				}
+				PlatformAudio.resumeContext();
 				if (!enableRepeatEvents && evt.isRepeat())
 					return;
 				LegacyKeycodeTranslator.LegacyKeycode keyCode = null;
