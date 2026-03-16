@@ -1,10 +1,12 @@
 package net.minecraft.src;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
+
 import net.lax1dude.eaglercraft.EagRuntime;
 import net.minecraft.client.Minecraft;
+import net.peyton.eagler.minecraft.TextureLocation;
+
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
@@ -21,11 +23,12 @@ public class GuiScreen extends Gui
     public int height;
 
     /** A list of all the controls added to this container. */
-    protected List controlList = new ArrayList();
+    protected List<GuiButton> controlList = new ArrayList<GuiButton>();
     public boolean allowUserInput = false;
 
     /** The FontRenderer used by GuiScreen */
     protected FontRenderer fontRenderer;
+
     public GuiParticle guiParticles;
 
     /** The button that was just pressed. */
@@ -36,11 +39,8 @@ public class GuiScreen extends Gui
      */
     public void drawScreen(int par1, int par2, float par3)
     {
-        Iterator var4 = this.controlList.iterator();
-
-        while (var4.hasNext())
-        {
-            GuiButton var5 = (GuiButton)var4.next();
+        for(int var4 = 0; var4 < this.controlList.size(); ++var4) {
+            GuiButton var5 = (GuiButton)this.controlList.get(var4);
             var5.drawButton(this.mc, par1, par2);
         }
     }
@@ -233,6 +233,8 @@ public class GuiScreen extends Gui
         }
     }
 
+    private static final TextureLocation background = new TextureLocation("/gui/background.png");
+
     /**
      * Draws the background (i is always 0 as of 1.2.2)
      */
@@ -241,7 +243,7 @@ public class GuiScreen extends Gui
         GL11.glDisable(GL11.GL_LIGHTING);
         GL11.glDisable(GL11.GL_FOG);
         Tessellator var2 = Tessellator.instance;
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, this.mc.renderEngine.getTexture("/gui/background.png"));
+        background.bindTexture();
         GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
         float var3 = 32.0F;
         var2.startDrawingQuads();

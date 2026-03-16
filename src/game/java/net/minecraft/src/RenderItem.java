@@ -59,7 +59,7 @@ public class RenderItem extends Render
         float var20;
         float var24;
 
-        boolean allow3d = EagRuntime.getPlatformType() == EnumPlatformType.DESKTOP;
+        boolean allow3d = true;
         if (var14 != null && RenderBlocks.renderItemIn3d(var14.getRenderType()) && allow3d)
         {
             GL11.glRotatef(var12, 0.0F, 1.0F, 0.0F);
@@ -192,7 +192,7 @@ public class RenderItem extends Render
         float var12;
         float var16;
 
-        boolean allow3d = EagRuntime.getPlatformType() == EnumPlatformType.DESKTOP;
+        boolean allow3d = true;
         if (par3 < 256 && RenderBlocks.renderItemIn3d(Block.blocksList[par3].getRenderType()) && allow3d)
         {
             par2RenderEngine.bindTexture(par2RenderEngine.getTexture("/terrain.png"));

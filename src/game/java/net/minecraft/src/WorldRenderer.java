@@ -179,6 +179,7 @@ public class WorldRenderer
                                         GL11.glTranslatef(-8.0F, -8.0F, -8.0F);
                                         GL11.glScalef(var19, var19, var19);
                                         GL11.glTranslatef(8.0F, 8.0F, 8.0F);
+                                        tessellator.setRenderingChunk(true);
                                         tessellator.startDrawingQuads();
                                         tessellator.setTranslation((double)(-this.posX), (double)(-this.posY), (double)(-this.posZ));
                                     }
@@ -216,6 +217,7 @@ public class WorldRenderer
                     if (var14)
                     {
                         tessellator.draw();
+                        tessellator.setRenderingChunk(false);
                         GL11.glPopMatrix();
                         GL11.glEndList();
                         tessellator.setTranslation(0.0D, 0.0D, 0.0D);

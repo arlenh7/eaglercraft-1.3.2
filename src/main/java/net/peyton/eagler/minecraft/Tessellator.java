@@ -47,15 +47,17 @@ public class Tessellator {
 	}
 
 	public void startDrawing(int var1) {
-		// Lock a consistent vertex format for the entire draw call
+		// Reset and lock a consistent vertex format for this draw
 		this.format.reset();
 		this.format.setTex();
 		this.format.setColor();
 		this.format.setNormal();
-		this.format.setLightmap();
+		if (this.renderingChunk) {
+			this.format.setLightmap();
+		}
 		this.format.updateVertexFormat();
 
-		// Default attribute values to avoid uninitialized data
+		// Reset per-draw defaults
 		this.textureU = 0.0D;
 		this.textureV = 0.0D;
 		this.colorR = 255;
@@ -101,9 +103,12 @@ public class Tessellator {
 	}
 
 	public void setBrightness(int brightness) {
-		this.lightmapU = brightness & 65535;
-		this.lightmapV = brightness >>> 16;
-		this.explicitLightmap = true;
+		if(!this.worldRenderer.needsUpdate) {
+			this.format.setLightmap();
+			this.lightmapU = brightness & 65535;
+			this.lightmapV = brightness >>> 16;
+			this.explicitLightmap = true;
+		}
 	}
 
 	public void addVertexWithUV(double var1, double var3, double var5, double var7, double var9) {

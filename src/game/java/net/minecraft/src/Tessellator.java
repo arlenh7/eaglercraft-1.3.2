@@ -82,4 +82,8 @@ public class Tessellator {
 		delegate.setBrightness(brightness);
 	}
 
+	public void setRenderingChunk(boolean renderingChunk) {
+		delegate.setRenderingChunk(renderingChunk);
+	}
+
 }

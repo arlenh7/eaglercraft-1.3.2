@@ -11,7 +11,6 @@ import static net.lax1dude.eaglercraft.opengl.EaglercraftGPU.*;
 
 public class GL11 extends RealOpenGLEnums {
 	
-	private static int lastBoundTexID = -1;
 
 	public static void glEnable(int p1) {
 		switch (p1) {
@@ -176,15 +175,10 @@ public class GL11 extends RealOpenGLEnums {
 	}
 
 	public static void glBindTexture(int i, int tex) {
-		//TODO: Remove the lastBoundTexID check and use bindTexture instead of bindTexture2 for newer versions of the game that have more than 1 active texture
-		if (tex == lastBoundTexID) {
-			return;
-		}
 		if (i != GL_TEXTURE_2D) {
 			throw new RuntimeException("Only 2D texture types are supported!");
 		}
-		lastBoundTexID = tex;
-		bindTexture2(lastBoundTexID);
+		bindTexture2(tex);
 	}
 
 	public static void glBlendFunc(int i, int j) {
@@ -226,6 +220,61 @@ public class GL11 extends RealOpenGLEnums {
 	}
 
 	public static void glColorMaterial(int i, int j) {
+		// Fixed function pipeline only needs the enable/disable state
+	}
+
+	private static final float[] mcLightDiffuse = new float[] { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+	private static final float[] mcLightPosX = new float[8];
+	private static final float[] mcLightPosY = new float[8];
+	private static final float[] mcLightPosZ = new float[8];
+	private static final float[] mcLightPosW = new float[8];
+	private static final boolean[] mcLightHasPos = new boolean[8];
+
+	public static void glLight(int light, int pname, FloatBuffer params) {
+		int idx = light - GL_LIGHT0;
+		if (idx < 0 || idx >= 8 || params == null || params.remaining() < 4) {
+			return;
+		}
+		switch (pname) {
+		case GL_POSITION: {
+			float x = params.get(0);
+			float y = params.get(1);
+			float z = params.get(2);
+			float w = params.get(3);
+			mcLightPosX[idx] = x;
+			mcLightPosY[idx] = y;
+			mcLightPosZ[idx] = z;
+			mcLightPosW[idx] = w;
+			mcLightHasPos[idx] = true;
+			if (w == 0.0f) {
+				GlStateManager.enableMCLight(idx, mcLightDiffuse[idx], x, y, z, 0.0);
+			}
+			break;
+		}
+		case GL_DIFFUSE: {
+			float r = params.get(0);
+			float g = params.get(1);
+			float b = params.get(2);
+			// MC uses a single diffuse scalar in shader, keep luminance-ish average
+			mcLightDiffuse[idx] = (r + g + b) * 0.33333334f;
+			if (mcLightHasPos[idx] && mcLightPosW[idx] == 0.0f) {
+				GlStateManager.enableMCLight(idx, mcLightDiffuse[idx], mcLightPosX[idx], mcLightPosY[idx],
+						mcLightPosZ[idx], 0.0);
+			}
+			break;
+		}
+		case GL_AMBIENT:
+		case GL_SPECULAR:
+		default:
+			// Not used by MC's fixed-function emulation
+			break;
+		}
+	}
+
+	public static void glLightModel(int pname, FloatBuffer params) {
+		if (pname == GL_LIGHT_MODEL_AMBIENT && params != null && params.remaining() >= 3) {
+			GlStateManager.setMCLightAmbient(params.get(0), params.get(1), params.get(2));
+		}
 	}
 
 	public static void glPolygonOffset(float f, float g) {

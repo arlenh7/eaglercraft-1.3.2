@@ -57,8 +57,11 @@ public class OpenGlHelper
      */
     public static void setLightmapTextureCoords(int par0, float par1, float par2)
     {
-        GlStateManager.setActiveTexture(par0);
-        GlStateManager.texCoords2D(par1, par2);
+        int tex = par0 - GL11.GL_TEXTURE0;
+        if (tex < 0) {
+            tex = 0;
+        }
+        GlStateManager.texCoords2DDirect(tex, par1, par2);
         if (par0 == lightmapTexUnit)
         {
             lastLightmapX = par1;
