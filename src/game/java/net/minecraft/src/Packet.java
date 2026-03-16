@@ -1,0 +1,437 @@
+package net.minecraft.src;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.EOFException;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+import net.peyton.eagler.minecraft.suppliers.PacketSupplier;
+
+public abstract class Packet
+{
+    /** Maps packet id to packet class */
+    public static IntHashMap packetIdToClassMap = new IntHashMap();
+
+    /** Maps packet class to packet id */
+    private static Map<Class<? extends Packet>, Integer> packetClassToIdMap = new HashMap();
+
+    /** List of the client's packet IDs. */
+    private static Set clientPacketIdList = new HashSet();
+
+    /** List of the server's packet IDs. */
+    private static Set serverPacketIdList = new HashSet();
+
+    /** the system time in milliseconds when this packet was created. */
+    public final long creationTimeMillis = System.currentTimeMillis();
+    public static long recievedID;
+    public static long recievedSize;
+
+    /** assumed to be sequential by the profiler */
+    public static long sentID;
+    public static long sentSize;
+
+    /**
+     * Only true for Packet51MapChunk, Packet52MultiBlockChange, Packet53BlockChange and Packet59ComplexEntity. Used to
+     * separate them into a different send queue.
+     */
+    public boolean isChunkDataPacket = false;
+
+    /**
+     * Adds a two way mapping between the packet ID and packet class.
+     */
+    static void addIdClassMapping(int par0, boolean par1, boolean par2, Class<? extends Packet> par3Class, PacketSupplier<? extends Packet> supplier)
+    {
+        if (packetIdToClassMap.containsItem(par0))
+        {
+            throw new IllegalArgumentException("Duplicate packet id:" + par0);
+        }
+        else if (packetClassToIdMap.containsKey(par3Class))
+        {
+            throw new IllegalArgumentException("Duplicate packet class:" + par3Class);
+        }
+        else
+        {
+            packetIdToClassMap.addKey(par0, supplier);
+            packetClassToIdMap.put(par3Class, Integer.valueOf(par0));
+
+            if (par1)
+            {
+                clientPacketIdList.add(Integer.valueOf(par0));
+            }
+
+            if (par2)
+            {
+                serverPacketIdList.add(Integer.valueOf(par0));
+            }
+        }
+    }
+
+    /**
+     * Returns a new instance of the specified Packet class.
+     */
+    public static Packet getNewPacket(int par0)
+    {
+        try
+        {
+            PacketSupplier<? extends Packet> var1 = (PacketSupplier<? extends Packet>)packetIdToClassMap.lookup(par0);
+            return var1 == null ? null : var1.createPacket();
+        }
+        catch (Exception var2)
+        {
+            var2.printStackTrace();
+            System.out.println("Skipping packet with id " + par0);
+            return null;
+        }
+    }
+
+    /**
+     * Writes a byte array to the DataOutputStream
+     */
+    public static void writeByteArray(DataOutputStream par0DataOutputStream, byte[] par1ArrayOfByte) throws IOException
+    {
+        par0DataOutputStream.writeShort(par1ArrayOfByte.length);
+        par0DataOutputStream.write(par1ArrayOfByte);
+    }
+
+    /**
+     * the first short in the stream indicates the number of bytes to read
+     */
+    public static byte[] readBytesFromStream(DataInputStream par0DataInputStream) throws IOException
+    {
+        short var1 = par0DataInputStream.readShort();
+
+        if (var1 < 0)
+        {
+            throw new IOException("Key was smaller than nothing!  Weird key!");
+        }
+        else
+        {
+            byte[] var2 = new byte[var1];
+            par0DataInputStream.read(var2);
+            return var2;
+        }
+    }
+
+    /**
+     * Returns the ID of this packet.
+     */
+    public final int getPacketId()
+    {
+        return ((Integer)packetClassToIdMap.get(this.getClass())).intValue();
+    }
+
+    /**
+     * Read a packet, prefixed by its ID, from the data stream.
+     */
+    public static Packet readPacket(DataInputStream par0DataInputStream, boolean par1) throws IOException
+    {
+        boolean var2 = false;
+        Packet var3 = null;
+        int var6;
+
+        try
+        {
+            var6 = par0DataInputStream.read();
+
+            if (var6 == -1)
+            {
+                return null;
+            }
+
+            if (par1 && !serverPacketIdList.contains(Integer.valueOf(var6)) || !par1 && !clientPacketIdList.contains(Integer.valueOf(var6)))
+            {
+                throw new IOException("Bad packet id " + var6);
+            }
+
+            var3 = getNewPacket(var6);
+
+            if (var3 == null)
+            {
+                throw new IOException("Bad packet id " + var6);
+            }
+
+            var3.readPacketData(par0DataInputStream);
+            ++recievedID;
+            recievedSize += (long)var3.getPacketSize();
+        }
+        catch (EOFException var5)
+        {
+            System.out.println("Reached end of stream");
+            return null;
+        }
+
+        PacketCount.countPacket(var6, (long)var3.getPacketSize());
+        ++recievedID;
+        recievedSize += (long)var3.getPacketSize();
+        return var3;
+    }
+
+    /**
+     * Writes a packet, prefixed by its ID, to the data stream.
+     */
+    public static void writePacket(Packet par0Packet, DataOutputStream par1DataOutputStream) throws IOException
+    {
+        par1DataOutputStream.write(par0Packet.getPacketId());
+        par0Packet.writePacketData(par1DataOutputStream);
+        ++sentID;
+        sentSize += (long)par0Packet.getPacketSize();
+    }
+
+    /**
+     * Writes a String to the DataOutputStream
+     */
+    public static void writeString(String par0Str, DataOutputStream par1DataOutputStream) throws IOException
+    {
+        if (par0Str.length() > 32767)
+        {
+            throw new IOException("String too big");
+        }
+        else
+        {
+            par1DataOutputStream.writeShort(par0Str.length());
+            par1DataOutputStream.writeChars(par0Str);
+        }
+    }
+
+    /**
+     * Reads a string from a packet
+     */
+    public static String readString(DataInputStream par0DataInputStream, int par1) throws IOException
+    {
+        short var2 = par0DataInputStream.readShort();
+
+        if (var2 > par1)
+        {
+            throw new IOException("Received string length longer than maximum allowed (" + var2 + " > " + par1 + ")");
+        }
+        else if (var2 < 0)
+        {
+            throw new IOException("Received string length is less than zero! Weird string!");
+        }
+        else
+        {
+            StringBuilder var3 = new StringBuilder();
+
+            for (int var4 = 0; var4 < var2; ++var4)
+            {
+                var3.append(par0DataInputStream.readChar());
+            }
+
+            return var3.toString();
+        }
+    }
+
+    /**
+     * Abstract. Reads the raw packet data from the data stream.
+     */
+    public abstract void readPacketData(DataInputStream var1) throws IOException;
+
+    /**
+     * Abstract. Writes the raw packet data to the data stream.
+     */
+    public abstract void writePacketData(DataOutputStream var1) throws IOException;
+
+    /**
+     * Passes this Packet on to the NetHandler for processing.
+     */
+    public abstract void processPacket(NetHandler var1);
+
+    /**
+     * Abstract. Return the size of the packet (not counting the header).
+     */
+    public abstract int getPacketSize();
+
+    /**
+     * only false for the abstract Packet class, all real packets return true
+     */
+    public boolean isRealPacket()
+    {
+        return false;
+    }
+
+    /**
+     * eg return packet30entity.entityId == entityId; WARNING : will throw if you compare a packet to a different packet
+     * class
+     */
+    public boolean containsSameEntityIDAs(Packet par1Packet)
+    {
+        return false;
+    }
+
+    /**
+     * if this returns false, processPacket is deffered for processReadPackets to handle
+     */
+    public boolean isWritePacket()
+    {
+        return false;
+    }
+
+    public String toString()
+    {
+        String var1 = this.getClass().getSimpleName();
+        return var1;
+    }
+
+    /**
+     * Reads a ItemStack from the InputStream
+     */
+    public static ItemStack readItemStack(DataInputStream par0DataInputStream) throws IOException
+    {
+        ItemStack var1 = null;
+        short var2 = par0DataInputStream.readShort();
+
+        if (var2 >= 0)
+        {
+            byte var3 = par0DataInputStream.readByte();
+            short var4 = par0DataInputStream.readShort();
+            var1 = new ItemStack(var2, var3, var4);
+            var1.stackTagCompound = readNBTTagCompound(par0DataInputStream);
+        }
+
+        return var1;
+    }
+
+    /**
+     * Writes the ItemStack's ID (short), then size (byte), then damage. (short)
+     */
+    public static void writeItemStack(ItemStack par0ItemStack, DataOutputStream par1DataOutputStream) throws IOException
+    {
+        if (par0ItemStack == null)
+        {
+            par1DataOutputStream.writeShort(-1);
+        }
+        else
+        {
+            par1DataOutputStream.writeShort(par0ItemStack.itemID);
+            par1DataOutputStream.writeByte(par0ItemStack.stackSize);
+            par1DataOutputStream.writeShort(par0ItemStack.getItemDamage());
+            NBTTagCompound var2 = null;
+
+            if (par0ItemStack.getItem().isDamageable() || par0ItemStack.getItem().getShareTag())
+            {
+                var2 = par0ItemStack.stackTagCompound;
+            }
+
+            writeNBTTagCompound(var2, par1DataOutputStream);
+        }
+    }
+
+    /**
+     * Reads a compressed NBTTagCompound from the InputStream
+     */
+    public static NBTTagCompound readNBTTagCompound(DataInputStream par0DataInputStream) throws IOException
+    {
+        short var1 = par0DataInputStream.readShort();
+
+        if (var1 < 0)
+        {
+            return null;
+        }
+        else
+        {
+            byte[] var2 = new byte[var1];
+            par0DataInputStream.readFully(var2);
+            return CompressedStreamTools.decompress(var2);
+        }
+    }
+
+    /**
+     * Writes a compressed NBTTagCompound to the OutputStream
+     */
+    protected static void writeNBTTagCompound(NBTTagCompound par0NBTTagCompound, DataOutputStream par1DataOutputStream) throws IOException
+    {
+        if (par0NBTTagCompound == null)
+        {
+            par1DataOutputStream.writeShort(-1);
+        }
+        else
+        {
+            byte[] var2 = CompressedStreamTools.compress(par0NBTTagCompound);
+            par1DataOutputStream.writeShort((short)var2.length);
+            par1DataOutputStream.write(var2);
+        }
+    }
+
+    static
+    {
+        addIdClassMapping(0, true, true, Packet0KeepAlive.class, Packet0KeepAlive::new);
+        addIdClassMapping(1, true, true, Packet1Login.class, Packet1Login::new);
+        addIdClassMapping(2, false, true, Packet2ClientProtocol.class, Packet2ClientProtocol::new);
+        addIdClassMapping(3, true, true, Packet3Chat.class, Packet3Chat::new);
+        addIdClassMapping(4, true, false, Packet4UpdateTime.class, Packet4UpdateTime::new);
+        addIdClassMapping(5, true, false, Packet5PlayerInventory.class, Packet5PlayerInventory::new);
+        addIdClassMapping(6, true, false, Packet6SpawnPosition.class, Packet6SpawnPosition::new);
+        addIdClassMapping(7, false, true, Packet7UseEntity.class, Packet7UseEntity::new);
+        addIdClassMapping(8, true, false, Packet8UpdateHealth.class, Packet8UpdateHealth::new);
+        addIdClassMapping(9, true, true, Packet9Respawn.class, Packet9Respawn::new);
+        addIdClassMapping(10, true, true, Packet10Flying.class, Packet10Flying::new);
+        addIdClassMapping(11, true, true, Packet11PlayerPosition.class, Packet11PlayerPosition::new);
+        addIdClassMapping(12, true, true, Packet12PlayerLook.class, Packet12PlayerLook::new);
+        addIdClassMapping(13, true, true, Packet13PlayerLookMove.class, Packet13PlayerLookMove::new);
+        addIdClassMapping(14, false, true, Packet14BlockDig.class, Packet14BlockDig::new);
+        addIdClassMapping(15, false, true, Packet15Place.class, Packet15Place::new);
+        addIdClassMapping(16, false, true, Packet16BlockItemSwitch.class, Packet16BlockItemSwitch::new);
+        addIdClassMapping(17, true, false, Packet17Sleep.class, Packet17Sleep::new);
+        addIdClassMapping(18, true, true, Packet18Animation.class, Packet18Animation::new);
+        addIdClassMapping(19, false, true, Packet19EntityAction.class, Packet19EntityAction::new);
+        addIdClassMapping(20, true, false, Packet20NamedEntitySpawn.class, Packet20NamedEntitySpawn::new);
+        addIdClassMapping(21, true, false, Packet21PickupSpawn.class, Packet21PickupSpawn::new);
+        addIdClassMapping(22, true, false, Packet22Collect.class, Packet22Collect::new);
+        addIdClassMapping(23, true, false, Packet23VehicleSpawn.class, Packet23VehicleSpawn::new);
+        addIdClassMapping(24, true, false, Packet24MobSpawn.class, Packet24MobSpawn::new);
+        addIdClassMapping(25, true, false, Packet25EntityPainting.class, Packet25EntityPainting::new);
+        addIdClassMapping(26, true, false, Packet26EntityExpOrb.class, Packet26EntityExpOrb::new);
+        addIdClassMapping(28, true, false, Packet28EntityVelocity.class, Packet28EntityVelocity::new);
+        addIdClassMapping(29, true, false, Packet29DestroyEntity.class, Packet29DestroyEntity::new);
+        addIdClassMapping(30, true, false, Packet30Entity.class, Packet30Entity::new);
+        addIdClassMapping(31, true, false, Packet31RelEntityMove.class, Packet31RelEntityMove::new);
+        addIdClassMapping(32, true, false, Packet32EntityLook.class, Packet32EntityLook::new);
+        addIdClassMapping(33, true, false, Packet33RelEntityMoveLook.class, Packet33RelEntityMoveLook::new);
+        addIdClassMapping(34, true, false, Packet34EntityTeleport.class, Packet34EntityTeleport::new);
+        addIdClassMapping(35, true, false, Packet35EntityHeadRotation.class, Packet35EntityHeadRotation::new);
+        addIdClassMapping(38, true, false, Packet38EntityStatus.class, Packet38EntityStatus::new);
+        addIdClassMapping(39, true, false, Packet39AttachEntity.class, Packet39AttachEntity::new);
+        addIdClassMapping(40, true, false, Packet40EntityMetadata.class, Packet40EntityMetadata::new);
+        addIdClassMapping(41, true, false, Packet41EntityEffect.class, Packet41EntityEffect::new);
+        addIdClassMapping(42, true, false, Packet42RemoveEntityEffect.class, Packet42RemoveEntityEffect::new);
+        addIdClassMapping(43, true, false, Packet43Experience.class, Packet43Experience::new);
+        addIdClassMapping(51, true, false, Packet51MapChunk.class, Packet51MapChunk::new);
+        addIdClassMapping(52, true, false, Packet52MultiBlockChange.class, Packet52MultiBlockChange::new);
+        addIdClassMapping(53, true, false, Packet53BlockChange.class, Packet53BlockChange::new);
+        addIdClassMapping(54, true, false, Packet54PlayNoteBlock.class, Packet54PlayNoteBlock::new);
+        addIdClassMapping(55, true, false, Packet55BlockDestroy.class, Packet55BlockDestroy::new);
+        addIdClassMapping(56, true, false, Packet56MapChunks.class, Packet56MapChunks::new);
+        addIdClassMapping(60, true, false, Packet60Explosion.class, Packet60Explosion::new);
+        addIdClassMapping(61, true, false, Packet61DoorChange.class, Packet61DoorChange::new);
+        addIdClassMapping(62, true, false, Packet62LevelSound.class, Packet62LevelSound::new);
+        addIdClassMapping(70, true, false, Packet70GameEvent.class, Packet70GameEvent::new);
+        addIdClassMapping(71, true, false, Packet71Weather.class, Packet71Weather::new);
+        addIdClassMapping(100, true, false, Packet100OpenWindow.class, Packet100OpenWindow::new);
+        addIdClassMapping(101, true, true, Packet101CloseWindow.class, Packet101CloseWindow::new);
+        addIdClassMapping(102, false, true, Packet102WindowClick.class, Packet102WindowClick::new);
+        addIdClassMapping(103, true, false, Packet103SetSlot.class, Packet103SetSlot::new);
+        addIdClassMapping(104, true, false, Packet104WindowItems.class, Packet104WindowItems::new);
+        addIdClassMapping(105, true, false, Packet105UpdateProgressbar.class, Packet105UpdateProgressbar::new);
+        addIdClassMapping(106, true, true, Packet106Transaction.class, Packet106Transaction::new);
+        addIdClassMapping(107, true, true, Packet107CreativeSetSlot.class, Packet107CreativeSetSlot::new);
+        addIdClassMapping(108, false, true, Packet108EnchantItem.class, Packet108EnchantItem::new);
+        addIdClassMapping(130, true, true, Packet130UpdateSign.class, Packet130UpdateSign::new);
+        addIdClassMapping(131, true, false, Packet131MapData.class, Packet131MapData::new);
+        addIdClassMapping(132, true, false, Packet132TileEntityData.class, Packet132TileEntityData::new);
+        addIdClassMapping(200, true, false, Packet200Statistic.class, Packet200Statistic::new);
+        addIdClassMapping(201, true, false, Packet201PlayerInfo.class, Packet201PlayerInfo::new);
+        addIdClassMapping(202, true, true, Packet202PlayerAbilities.class, Packet202PlayerAbilities::new);
+        addIdClassMapping(203, true, true, Packet203AutoComplete.class, Packet203AutoComplete::new);
+        addIdClassMapping(204, false, true, Packet204ClientInfo.class, Packet204ClientInfo::new);
+        addIdClassMapping(205, false, true, Packet205ClientCommand.class, Packet205ClientCommand::new);
+        addIdClassMapping(250, true, true, Packet250CustomPayload.class, Packet250CustomPayload::new);
+        addIdClassMapping(252, true, true, Packet252SharedKey.class, Packet252SharedKey::new);
+        addIdClassMapping(253, true, false, Packet253ServerAuthData.class, Packet253ServerAuthData::new);
+        addIdClassMapping(254, false, true, Packet254ServerPing.class, Packet254ServerPing::new);
+        addIdClassMapping(255, true, true, Packet255KickDisconnect.class, Packet255KickDisconnect::new);
+    }
+}
