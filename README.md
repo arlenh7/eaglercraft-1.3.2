@@ -1,19 +1,19 @@
 # Eaglercraft 1.3.2
 Minecraft 1.3.2 ported to TeaVM
+NOTE: this was made in 3 days and I have no experience porting, EXPECT bad fps and a bunch of bugs
 <br>
 <br>
-UPDATES:
+LOGS:
 <br>
-added 1.3.2 code
+Added the full code of 1.3.2
 <br>
-ported almost everything!
+Ported the code into eaglercraft stuff
 <br>
-Added edit profile
+Added 1.5.2's acknowledgement screen onto the main menu
 <br>
-Added sound
+Added and fixed sound
 <br>
+Fixed world generation
 <br>
+Made custom edit profile
 <br>
-CURRENT ERROR:
-<br>
-idek what it is bro just a bunch of stuff pray i can fix it
