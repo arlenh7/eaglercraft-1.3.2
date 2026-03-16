@@ -4,6 +4,10 @@ import net.lax1dude.eaglercraft.opengl.VertexFormat;
 import net.lax1dude.eaglercraft.opengl.WorldVertexBufferUploader;
 
 public class Tessellator {
+
+	// TEMP: disable lightmap path to avoid black/invisible world rendering if lightmap coords are broken
+	// Flip to true once lightmap pipeline is confirmed working.
+	private static final boolean ENABLE_LIGHTMAP = false;
 	
 	private net.lax1dude.eaglercraft.opengl.WorldRenderer worldRenderer;
 	public static final Tessellator instance = new Tessellator(524288);
@@ -52,7 +56,7 @@ public class Tessellator {
 		this.format.setTex();
 		this.format.setColor();
 		this.format.setNormal();
-		if (this.renderingChunk) {
+		if (this.renderingChunk && ENABLE_LIGHTMAP) {
 			this.format.setLightmap();
 		}
 		this.format.updateVertexFormat();
@@ -103,6 +107,9 @@ public class Tessellator {
 	}
 
 	public void setBrightness(int brightness) {
+		if(!ENABLE_LIGHTMAP) {
+			return;
+		}
 		if(!this.worldRenderer.needsUpdate) {
 			this.format.setLightmap();
 			this.lightmapU = brightness & 65535;

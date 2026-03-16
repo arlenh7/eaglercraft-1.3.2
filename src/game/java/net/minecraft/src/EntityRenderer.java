@@ -110,6 +110,7 @@ public class EntityRenderer
      */
     private boolean lightmapUpdateNeeded = false;
 
+
     /** Torch flicker X */
     float torchFlickerX = 0.0F;
 

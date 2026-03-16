@@ -15,6 +15,8 @@ import org.lwjgl.opengl.GL11;
 
 public class RenderGlobal implements IWorldAccess
 {
+    private static final boolean DISABLE_TERRAIN_LIGHTMAP = true;
+
     public List tileEntities = new ArrayList();
     private WorldClient theWorld;
 
@@ -384,6 +386,7 @@ public class RenderGlobal implements IWorldAccess
             this.renderEntitiesStartupCounter = 2;
         }
     }
+
 
     /**
      * Renders all entities within range and within the frustrum. Args: pos, frustrum, partialTickTime
@@ -849,7 +852,14 @@ public class RenderGlobal implements IWorldAccess
      */
     public void renderAllRenderLists(int par1, double par2)
     {
-        this.mc.entityRenderer.enableLightmap(par2);
+        if (!DISABLE_TERRAIN_LIGHTMAP) {
+            this.mc.entityRenderer.enableLightmap(par2);
+        } else {
+            // Make sure the lightmap texture unit is disabled
+            OpenGlHelper.setActiveTexture(OpenGlHelper.lightmapTexUnit);
+            GL11.glDisable(GL11.GL_TEXTURE_2D);
+            OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
+        }
         RenderList[] var4 = this.allRenderLists;
         int var5 = var4.length;
 
@@ -859,7 +869,9 @@ public class RenderGlobal implements IWorldAccess
             var7.func_78419_a();
         }
 
-        this.mc.entityRenderer.disableLightmap(par2);
+        if (!DISABLE_TERRAIN_LIGHTMAP) {
+            this.mc.entityRenderer.disableLightmap(par2);
+        }
     }
 
     public void updateClouds()

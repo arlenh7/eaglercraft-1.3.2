@@ -149,6 +149,7 @@ public class GameSettings
         this.language = "en_US";
     }
 
+
     public String getKeyBindingDescription(int par1)
     {
         StringTranslate var2 = StringTranslate.getInstance();
