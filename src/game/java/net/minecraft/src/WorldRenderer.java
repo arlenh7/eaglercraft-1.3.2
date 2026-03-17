@@ -2,6 +2,7 @@ package net.minecraft.src;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import org.lwjgl.opengl.GL11;
 
@@ -68,9 +69,11 @@ public class WorldRenderer
     /** Is the chunk lit */
     public boolean isChunkLit;
     private boolean isInitialized = false;
+    private final RenderBlocks chunkRenderBlocks = new RenderBlocks();
 
     /** All the tile entities that have special rendering code for this chunk */
-    public List tileEntityRenderers = new ArrayList();
+    private final HashSet tileEntityRenderers = new HashSet();
+    private final HashSet prevTileEntityRenderers = new HashSet();
     private List tileEntities;
 
     /** Bytes sent to the GPU */
@@ -141,8 +144,8 @@ public class WorldRenderer
             }
 
             Chunk.isLit = false;
-            HashSet var21 = new HashSet();
-            var21.addAll(this.tileEntityRenderers);
+            this.prevTileEntityRenderers.clear();
+            this.prevTileEntityRenderers.addAll(this.tileEntityRenderers);
             this.tileEntityRenderers.clear();
             byte var8 = 1;
             ChunkCache var9 = new ChunkCache(this.worldObj, var1 - var8, var2 - var8, var3 - var8, var4 + var8, var5 + var8, var6 + var8);
@@ -150,7 +153,8 @@ public class WorldRenderer
             if (!var9.extendedLevelsInChunkCache())
             {
                 ++chunksUpdated;
-                RenderBlocks var10 = new RenderBlocks(var9);
+                RenderBlocks var10 = this.chunkRenderBlocks;
+                var10.blockAccess = var9;
                 this.bytesDrawn = 0;
 
                 for (int var11 = 0; var11 < 2; ++var11)
@@ -239,12 +243,30 @@ public class WorldRenderer
                 }
             }
 
-            HashSet var22 = new HashSet();
-            var22.addAll(this.tileEntityRenderers);
-            var22.removeAll(var21);
-            this.tileEntities.addAll(var22);
-            var21.removeAll(this.tileEntityRenderers);
-            this.tileEntities.removeAll(var21);
+            Iterator var21 = this.tileEntityRenderers.iterator();
+
+            while (var21.hasNext())
+            {
+                Object var22 = var21.next();
+
+                if (!this.prevTileEntityRenderers.contains(var22))
+                {
+                    this.tileEntities.add(var22);
+                }
+            }
+
+            var21 = this.prevTileEntityRenderers.iterator();
+
+            while (var21.hasNext())
+            {
+                Object var22 = var21.next();
+
+                if (!this.tileEntityRenderers.contains(var22))
+                {
+                    this.tileEntities.remove(var22);
+                }
+            }
+
             this.isChunkLit = Chunk.isLit;
             this.isInitialized = true;
         }

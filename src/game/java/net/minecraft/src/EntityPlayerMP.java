@@ -5,8 +5,12 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
+import net.lax1dude.eaglercraft.EagRuntime;
+import net.lax1dude.eaglercraft.internal.EnumPlatformType;
 import net.minecraft.server.MinecraftServer;
 
 public class EntityPlayerMP extends EntityPlayer implements ICrafting
@@ -23,7 +27,10 @@ public class EntityPlayerMP extends EntityPlayer implements ICrafting
     public ItemInWorldManager theItemInWorldManager;
     public double field_71131_d;
     public double field_71132_e;
-    public final List chunksToLoad = new LinkedList();
+    public final Set chunksToLoad = new LinkedHashSet();
+    private final ArrayList chunkLoadBuffer = new ArrayList(5);
+    private final ArrayList tileEntityLoadBuffer = new ArrayList(32);
+    private final int chunkSendBudget = EagRuntime.getPlatformType() == EnumPlatformType.DESKTOP ? 5 : 4;
 
     /** entities added to this list will  be packet29'd to the player */
     public final List destroyedItemsNetCache = new LinkedList();
@@ -170,11 +177,13 @@ public class EntityPlayerMP extends EntityPlayer implements ICrafting
 
         if (!this.chunksToLoad.isEmpty())
         {
-            ArrayList var6 = new ArrayList();
+            ArrayList var6 = this.chunkLoadBuffer;
+            var6.clear();
             Iterator var7 = this.chunksToLoad.iterator();
-            ArrayList var3 = new ArrayList();
+            ArrayList var3 = this.tileEntityLoadBuffer;
+            var3.clear();
 
-            while (var7.hasNext() && var6.size() < 5)
+            while (var7.hasNext() && var6.size() < this.chunkSendBudget)
             {
                 ChunkCoordIntPair var4 = (ChunkCoordIntPair)var7.next();
                 var7.remove();

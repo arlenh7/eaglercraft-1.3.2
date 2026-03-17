@@ -3,6 +3,7 @@ package net.minecraft.src;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -19,13 +20,17 @@ public class RenderGlobal implements IWorldAccess
 {
     private static final boolean DISABLE_TERRAIN_LIGHTMAP = true;
     // Limit chunk rebuild work per frame to keep FPS stable on WebGL
-    private static final int MAX_NEAR_CHUNK_UPDATES_PER_CALL = 1;
-    private static final int MAX_FAR_CHUNK_UPDATES_PER_CALL = 1;
+    private static final int MAX_NEAR_CHUNK_UPDATES_PER_CALL = 2;
+    private static final int MAX_FAR_CHUNK_UPDATES_PER_CALL = 2;
     // Clamp render distance for web targets to keep chunk count manageable
     // Note: renderDistance uses 0=far, 1=normal, 2=short, 3=tiny
     private static final int MIN_RENDER_DISTANCE_WEB = 1; // cap to at least "normal" (17x17)
     // Reduce background dirty checks per frame
-    private static final int MAX_DIRTY_RENDERERS_CHECK = 4;
+    private static final int MAX_DIRTY_RENDERERS_CHECK = 8;
+    // Cap how many queued chunk renderers are scanned each frame on web targets
+    private static final int MAX_CHUNK_UPDATE_SCAN_PER_CALL_WEB = 128;
+    // During world load on web targets, only synchronously rebuild chunks near spawn
+    private static final int WEB_SYNC_REBUILD_RADIUS_BLOCKS = 96;
 
     public List tileEntities = new ArrayList();
     private WorldClient theWorld;
@@ -33,6 +38,7 @@ public class RenderGlobal implements IWorldAccess
     /** The RenderEngine instance used by RenderGlobal */
     private final RenderEngine renderEngine;
     private List worldRenderersToUpdate = new ArrayList();
+    private final HashSet worldRenderersToUpdateSet = new HashSet();
     private WorldRenderer[] sortedWorldRenderers;
     private WorldRenderer[] worldRenderers;
     private int renderChunksWide;
@@ -130,10 +136,50 @@ public class RenderGlobal implements IWorldAccess
 
     /** All render lists (fixed length 4) */
     private RenderList[] allRenderLists = new RenderList[] {new RenderList(), new RenderList(), new RenderList(), new RenderList()};
+    private final WorldRenderer[] farChunkUpdateCandidates = new WorldRenderer[MAX_FAR_CHUNK_UPDATES_PER_CALL];
+    private final ArrayList nearChunkUpdateCandidates = new ArrayList(MAX_NEAR_CHUNK_UPDATES_PER_CALL);
+    private int chunkUpdateScanCursor = 0;
 
     public float getCloudCounter(float partialTicks)
     {
         return (float)this.cloudOffsetX + partialTicks;
+    }
+
+    private void clearWorldRendererUpdateQueue()
+    {
+        this.worldRenderersToUpdate.clear();
+        this.worldRenderersToUpdateSet.clear();
+    }
+
+    private void queueWorldRendererForUpdate(WorldRenderer renderer)
+    {
+        if (renderer != null && this.worldRenderersToUpdateSet.add(renderer))
+        {
+            this.worldRenderersToUpdate.add(renderer);
+        }
+    }
+
+    private void dequeueWorldRendererForUpdate(WorldRenderer renderer)
+    {
+        if (renderer != null)
+        {
+            this.worldRenderersToUpdateSet.remove(renderer);
+        }
+    }
+
+    private int getNearChunkUpdateBudget()
+    {
+        return EagRuntime.getPlatformType() == EnumPlatformType.DESKTOP ? 2 : 1;
+    }
+
+    private int getFarChunkUpdateBudget()
+    {
+        return EagRuntime.getPlatformType() == EnumPlatformType.DESKTOP ? 2 : 1;
+    }
+
+    private int getDirtyRendererChecksPerCall()
+    {
+        return EagRuntime.getPlatformType() == EnumPlatformType.DESKTOP ? MAX_DIRTY_RENDERERS_CHECK : 4;
     }
 
     /**
@@ -379,7 +425,7 @@ public class RenderGlobal implements IWorldAccess
                 var5 = (WorldRenderer)var8.next();
             }
 
-            this.worldRenderersToUpdate.clear();
+            this.clearWorldRendererUpdateQueue();
             this.tileEntities.clear();
 
             for (int var9 = 0; var9 < this.renderChunksWide; ++var9)
@@ -401,7 +447,7 @@ public class RenderGlobal implements IWorldAccess
                         this.worldRenderers[(var6 * this.renderChunksTall + var11) * this.renderChunksWide + var9].chunkIndex = var3++;
                         this.worldRenderers[(var6 * this.renderChunksTall + var11) * this.renderChunksWide + var9].markDirty();
                         this.sortedWorldRenderers[(var6 * this.renderChunksTall + var11) * this.renderChunksWide + var9] = this.worldRenderers[(var6 * this.renderChunksTall + var11) * this.renderChunksWide + var9];
-                        this.worldRenderersToUpdate.add(this.worldRenderers[(var6 * this.renderChunksTall + var11) * this.renderChunksWide + var9]);
+                        this.queueWorldRendererForUpdate(this.worldRenderers[(var6 * this.renderChunksTall + var11) * this.renderChunksWide + var9]);
                         var2 += 3;
                     }
                 }
@@ -438,8 +484,17 @@ public class RenderGlobal implements IWorldAccess
             progress.resetProgresAndWorkingMessage("Rendering chunks");
         }
 
+        boolean lowEndRuntime = EagRuntime.getPlatformType() != EnumPlatformType.DESKTOP;
+        ChunkCoordinates spawn = this.theWorld.getSpawnPoint();
+
+        if (this.mc.renderViewEntity == null)
+        {
+            this.markRenderersForNewPosition(spawn.posX, spawn.posY, spawn.posZ);
+        }
+
         int total = this.worldRenderers.length;
         int lastPct = -1;
+        int syncRadiusSq = WEB_SYNC_REBUILD_RADIUS_BLOCKS * WEB_SYNC_REBUILD_RADIUS_BLOCKS;
 
         for (int i = 0; i < total; ++i)
         {
@@ -447,6 +502,17 @@ public class RenderGlobal implements IWorldAccess
 
             if (wr != null)
             {
+                if (lowEndRuntime)
+                {
+                    int dx = wr.posXPlus - spawn.posX;
+                    int dz = wr.posZPlus - spawn.posZ;
+
+                    if (dx * dx + dz * dz > syncRadiusSq)
+                    {
+                        continue;
+                    }
+                }
+
                 wr.updateRenderer();
                 wr.needsUpdate = false;
             }
@@ -468,7 +534,20 @@ public class RenderGlobal implements IWorldAccess
             progress.setLoadingProgress(100);
         }
 
-        this.worldRenderersToUpdate.clear();
+        this.clearWorldRendererUpdateQueue();
+
+        if (lowEndRuntime)
+        {
+            for (int i = 0; i < total; ++i)
+            {
+                WorldRenderer wr = this.worldRenderers[i];
+
+                if (wr != null && wr.needsUpdate)
+                {
+                    this.queueWorldRendererForUpdate(wr);
+                }
+            }
+        }
     }
 
 
@@ -580,12 +659,12 @@ public class RenderGlobal implements IWorldAccess
 
     public int getChunkUpdateQueueSize()
     {
-        return this.worldRenderersToUpdate != null ? this.worldRenderersToUpdate.size() : 0;
+        return this.worldRenderersToUpdate != null ? this.worldRenderersToUpdateSet.size() : 0;
     }
 
     public int getChunkUpdateLimit()
     {
-        return MAX_NEAR_CHUNK_UPDATES_PER_CALL + MAX_FAR_CHUNK_UPDATES_PER_CALL;
+        return this.getNearChunkUpdateBudget() + this.getFarChunkUpdateBudget();
     }
 
     /**
@@ -672,7 +751,7 @@ public class RenderGlobal implements IWorldAccess
 
                     if (!var15 && var14.needsUpdate)
                     {
-                        this.worldRenderersToUpdate.add(var14);
+                        this.queueWorldRendererForUpdate(var14);
                     }
                 }
             }
@@ -686,14 +765,14 @@ public class RenderGlobal implements IWorldAccess
     {
         this.theWorld.theProfiler.startSection("sortchunks");
 
-        for (int var5 = 0; var5 < MAX_DIRTY_RENDERERS_CHECK; ++var5)
+        for (int var5 = 0, var6CheckCount = this.getDirtyRendererChecksPerCall(); var5 < var6CheckCount; ++var5)
         {
             this.worldRenderersCheckIndex = (this.worldRenderersCheckIndex + 1) % this.worldRenderers.length;
             WorldRenderer var6 = this.worldRenderers[this.worldRenderersCheckIndex];
 
-            if (var6.needsUpdate && !this.worldRenderersToUpdate.contains(var6))
+            if (var6.needsUpdate)
             {
-                this.worldRenderersToUpdate.add(var6);
+                this.queueWorldRendererForUpdate(var6);
             }
         }
 
@@ -1501,154 +1580,167 @@ public class RenderGlobal implements IWorldAccess
      */
     public boolean updateRenderers(EntityLiving par1EntityLiving, boolean par2)
     {
-        int var3 = MAX_FAR_CHUNK_UPDATES_PER_CALL;
-        RenderSorter var4 = new RenderSorter(par1EntityLiving);
-        WorldRenderer[] var5 = new WorldRenderer[var3];
-        ArrayList var6 = null;
-        int var7 = this.worldRenderersToUpdate.size();
-        int var8 = 0;
-        int nearUpdates = 0;
-        this.theWorld.theProfiler.startSection("nearChunksSearch");
-        int var9;
-        WorldRenderer var10;
-        int var11;
-        int var12;
-        label136:
+        int var3 = this.getFarChunkUpdateBudget();
+        int var4 = this.getNearChunkUpdateBudget();
+        RenderSorter var5 = new RenderSorter(par1EntityLiving);
+        WorldRenderer[] var6 = this.farChunkUpdateCandidates;
+        Arrays.fill(var6, (Object)null);
+        ArrayList var7 = this.nearChunkUpdateCandidates;
+        var7.clear();
+        int var8 = this.worldRenderersToUpdate.size();
 
-        for (var9 = 0; var9 < var7; ++var9)
+        if (var8 <= 0)
         {
-            var10 = (WorldRenderer)this.worldRenderersToUpdate.get(var9);
+            return true;
+        }
 
-            if (var10 != null)
+        int var9 = var8;
+
+        if (!par2 && EagRuntime.getPlatformType() != EnumPlatformType.DESKTOP)
+        {
+            var9 = Math.min(var8, MAX_CHUNK_UPDATE_SCAN_PER_CALL_WEB);
+        }
+
+        int var10 = this.chunkUpdateScanCursor;
+
+        if (var10 >= var8)
+        {
+            var10 = 0;
+        }
+
+        this.theWorld.theProfiler.startSection("nearChunksSearch");
+
+        for (int var11 = 0; var11 < var9; ++var11)
+        {
+            int var12 = var10 + var11;
+
+            if (var12 >= var8)
             {
-                if (!par2)
+                var12 -= var8;
+            }
+
+            WorldRenderer var13 = (WorldRenderer)this.worldRenderersToUpdate.get(var12);
+
+            if (var13 == null)
+            {
+                continue;
+            }
+
+            if (!var13.needsUpdate)
+            {
+                this.dequeueWorldRendererForUpdate(var13);
+                this.worldRenderersToUpdate.set(var12, (Object)null);
+                continue;
+            }
+
+            if (!par2 && var13.distanceToEntitySquared(par1EntityLiving) > 256.0F)
+            {
+                if (var13.isInFrustum)
                 {
-                    if (var10.distanceToEntitySquared(par1EntityLiving) > 256.0F)
+                    for (int var14 = 0; var14 < var3; ++var14)
                     {
-                        for (var11 = 0; var11 < var3 && (var5[var11] == null || var4.doCompare(var5[var11], var10) <= 0); ++var11)
+                        if (var6[var14] == null)
                         {
-                            ;
+                            var6[var14] = var13;
+                            break;
                         }
-
-                        --var11;
-
-                        if (var11 > 0)
-                        {
-                            var12 = var11;
-
-                            while (true)
-                            {
-                                --var12;
-
-                                if (var12 == 0)
-                                {
-                                    var5[var11] = var10;
-                                    continue label136;
-                                }
-
-                                var5[var12 - 1] = var5[var12];
-                            }
-                        }
-
-                        continue;
                     }
                 }
 
-                if (!var10.isInFrustum)
-                {
-                    continue;
-                }
-
-                if (var6 == null)
-                {
-                    var6 = new ArrayList();
-                }
-
-                ++var8;
-                var6.add(var10);
-                this.worldRenderersToUpdate.set(var9, (Object)null);
+                continue;
             }
+
+            if (!var13.isInFrustum)
+            {
+                continue;
+            }
+
+            var7.add(var13);
+            this.dequeueWorldRendererForUpdate(var13);
+            this.worldRenderersToUpdate.set(var12, (Object)null);
         }
 
+        this.chunkUpdateScanCursor = (var10 + var9) % var8;
         this.theWorld.theProfiler.endSection();
         this.theWorld.theProfiler.startSection("sort");
 
-        if (var6 != null)
+        if (!var7.isEmpty())
         {
-            if (var6.size() > 1)
+            if (var7.size() > 1)
             {
-                Collections.sort(var6, var4);
+                Collections.sort(var7, var5);
             }
 
-            for (var9 = var6.size() - 1; var9 >= 0; --var9)
+            int var15 = 0;
+
+            for (int var16 = var7.size() - 1; var16 >= 0; --var16)
             {
-                var10 = (WorldRenderer)var6.get(var9);
-                if (nearUpdates < MAX_NEAR_CHUNK_UPDATES_PER_CALL)
+                WorldRenderer var17 = (WorldRenderer)var7.get(var16);
+
+                if (var15 < var4)
                 {
-                    var10.updateRenderer();
-                    var10.needsUpdate = false;
-                    ++nearUpdates;
+                    var17.updateRenderer();
+                    var17.needsUpdate = false;
+                    ++var15;
                 }
                 else
                 {
-                    this.worldRenderersToUpdate.add(var10);
+                    this.queueWorldRendererForUpdate(var17);
                 }
             }
         }
 
         this.theWorld.theProfiler.endSection();
-        var9 = 0;
         this.theWorld.theProfiler.startSection("rebuild");
-        int var16;
 
-        for (var16 = var3 - 1; var16 >= 0; --var16)
+        for (int var18 = 0; var18 < var3; ++var18)
         {
-            WorldRenderer var17 = var5[var16];
+            WorldRenderer var19 = var6[var18];
 
-            if (var17 != null)
+            if (var19 != null && var19.needsUpdate)
             {
-                if (!var17.isInFrustum && var16 != var3 - 1)
-                {
-                    var5[var16] = null;
-                    var5[0] = null;
-                    break;
-                }
-
-                var5[var16].updateRenderer();
-                var5[var16].needsUpdate = false;
-                ++var9;
+                var19.updateRenderer();
+                var19.needsUpdate = false;
+                this.dequeueWorldRendererForUpdate(var19);
             }
         }
 
         this.theWorld.theProfiler.endSection();
-        this.theWorld.theProfiler.startSection("cleanup");
-        var16 = 0;
-        var11 = 0;
+        boolean var20 = par2 || EagRuntime.getPlatformType() == EnumPlatformType.DESKTOP || this.worldRenderersToUpdate.size() <= MAX_CHUNK_UPDATE_SCAN_PER_CALL_WEB || (this.cloudOffsetX & 7) == 0;
 
-        for (var12 = this.worldRenderersToUpdate.size(); var16 != var12; ++var16)
+        if (!var20)
         {
-            WorldRenderer var13 = (WorldRenderer)this.worldRenderersToUpdate.get(var16);
+            return true;
+        }
 
-            if (var13 != null)
+        this.theWorld.theProfiler.startSection("cleanup");
+        int var21 = 0;
+        int var22;
+
+        for (var22 = 0; var22 < this.worldRenderersToUpdate.size(); ++var22)
+        {
+            WorldRenderer var23 = (WorldRenderer)this.worldRenderersToUpdate.get(var22);
+
+            if (var23 != null)
             {
-                boolean var14 = false;
+                boolean var24 = false;
 
-                for (int var15 = 0; var15 < var3 && !var14; ++var15)
+                for (int var25 = 0; var25 < var3 && !var24; ++var25)
                 {
-                    if (var13 == var5[var15])
+                    if (var23 == var6[var25])
                     {
-                        var14 = true;
+                        var24 = true;
                     }
                 }
 
-                if (!var14)
+                if (!var24)
                 {
-                    if (var11 != var16)
+                    if (var21 != var22)
                     {
-                        this.worldRenderersToUpdate.set(var11, var13);
+                        this.worldRenderersToUpdate.set(var21, var23);
                     }
 
-                    ++var11;
+                    ++var21;
                 }
             }
         }
@@ -1656,19 +1748,13 @@ public class RenderGlobal implements IWorldAccess
         this.theWorld.theProfiler.endSection();
         this.theWorld.theProfiler.startSection("trim");
 
-        while (true)
+        for (var22 = this.worldRenderersToUpdate.size() - 1; var22 >= var21; --var22)
         {
-            --var16;
-
-            if (var16 < var11)
-            {
-                this.theWorld.theProfiler.endSection();
-                // Limit work per frame; update loop should only run once per frame
-                return true;
-            }
-
-            this.worldRenderersToUpdate.remove(var16);
+            this.worldRenderersToUpdate.remove(var22);
         }
+
+        this.theWorld.theProfiler.endSection();
+        return true;
     }
 
     public void drawBlockBreaking(EntityPlayer par1EntityPlayer, MovingObjectPosition par2MovingObjectPosition, int par3, ItemStack par4ItemStack, float par5)
@@ -1857,7 +1943,7 @@ public class RenderGlobal implements IWorldAccess
 
                     if (var20 != null && !var20.needsUpdate)
                     {
-                        this.worldRenderersToUpdate.add(var20);
+                        this.queueWorldRendererForUpdate(var20);
                         var20.markDirty();
                     }
                 }

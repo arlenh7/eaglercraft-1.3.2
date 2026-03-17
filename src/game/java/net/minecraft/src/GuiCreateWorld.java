@@ -211,8 +211,6 @@ public class GuiCreateWorld extends GuiScreen
             }
             else if (par1GuiButton.id == 0)
             {
-                this.mc.displayGuiScreen((GuiScreen)null);
-
                 if (this.createClicked)
                 {
                     return;

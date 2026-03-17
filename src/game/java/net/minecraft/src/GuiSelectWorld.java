@@ -169,8 +169,6 @@ public class GuiSelectWorld extends GuiScreen
      */
     public void selectWorld(int par1)
     {
-        this.mc.displayGuiScreen((GuiScreen)null);
-
         if (!this.selected)
         {
             this.selected = true;

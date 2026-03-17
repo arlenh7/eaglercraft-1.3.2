@@ -2,6 +2,8 @@ package net.minecraft.src;
 
 import java.util.List;
 import java.util.Random;
+import net.lax1dude.eaglercraft.EagRuntime;
+import net.lax1dude.eaglercraft.internal.EnumPlatformType;
 
 public class ChunkProviderHell implements IChunkProvider
 {
@@ -43,11 +45,20 @@ public class ChunkProviderHell implements IChunkProvider
     double[] noiseData3;
     double[] noiseData4;
     double[] noiseData5;
+    private final WorldGenHellLava hellLavaGenerator = new WorldGenHellLava(Block.lavaMoving.blockID);
+    private final WorldGenFire fireGenerator = new WorldGenFire();
+    private final WorldGenGlowStone1 glowStoneGenerator1 = new WorldGenGlowStone1();
+    private final WorldGenGlowStone2 glowStoneGenerator2 = new WorldGenGlowStone2();
+    private final WorldGenFlowers brownMushroomGenerator = new WorldGenFlowers(Block.mushroomBrown.blockID);
+    private final WorldGenFlowers redMushroomGenerator = new WorldGenFlowers(Block.mushroomRed.blockID);
+    private final boolean lowEndWorldgen;
+    private double[] noiseColumnBuffer;
 
     public ChunkProviderHell(World par1World, long par2)
     {
         this.worldObj = par1World;
         this.hellRNG = new Random(par2);
+        this.lowEndWorldgen = EagRuntime.getPlatformType() != EnumPlatformType.DESKTOP;
         this.netherNoiseGen1 = new NoiseGeneratorOctaves(this.hellRNG, 16);
         this.netherNoiseGen2 = new NoiseGeneratorOctaves(this.hellRNG, 16);
         this.netherNoiseGen3 = new NoiseGeneratorOctaves(this.hellRNG, 8);
@@ -288,7 +299,12 @@ public class ChunkProviderHell implements IChunkProvider
         this.noiseData3 = this.netherNoiseGen2.generateNoiseOctaves(this.noiseData3, par2, par3, par4, par5, par6, par7, var8, var10, var8);
         int var12 = 0;
         int var13 = 0;
-        double[] var14 = new double[par6];
+        if (this.noiseColumnBuffer == null || this.noiseColumnBuffer.length != par6)
+        {
+            this.noiseColumnBuffer = new double[par6];
+        }
+
+        double[] var14 = this.noiseColumnBuffer;
         int var15;
 
         for (var15 = 0; var15 < par6; ++var15)
@@ -428,21 +444,29 @@ public class ChunkProviderHell implements IChunkProvider
         BlockSand.fallInstantly = true;
         int var4 = par2 * 16;
         int var5 = par3 * 16;
+        int var6LavaAttempts = this.lowEndWorldgen ? 4 : 8;
+        int var7GlowStone2Attempts = this.lowEndWorldgen ? 5 : 10;
+        int var8MushroomChance = this.lowEndWorldgen ? 2 : 1;
         this.genNetherBridge.generateStructuresInChunk(this.worldObj, this.hellRNG, par2, par3);
         int var6;
         int var7;
         int var8;
         int var9;
 
-        for (var6 = 0; var6 < 8; ++var6)
+        for (var6 = 0; var6 < var6LavaAttempts; ++var6)
         {
             var7 = var4 + this.hellRNG.nextInt(16) + 8;
             var8 = this.hellRNG.nextInt(120) + 4;
             var9 = var5 + this.hellRNG.nextInt(16) + 8;
-            (new WorldGenHellLava(Block.lavaMoving.blockID)).generate(this.worldObj, this.hellRNG, var7, var8, var9);
+            this.hellLavaGenerator.generate(this.worldObj, this.hellRNG, var7, var8, var9);
         }
 
         var6 = this.hellRNG.nextInt(this.hellRNG.nextInt(10) + 1) + 1;
+        if (this.lowEndWorldgen)
+        {
+            var6 = (var6 + 1) >> 1;
+        }
+
         int var10;
 
         for (var7 = 0; var7 < var6; ++var7)
@@ -450,41 +474,45 @@ public class ChunkProviderHell implements IChunkProvider
             var8 = var4 + this.hellRNG.nextInt(16) + 8;
             var9 = this.hellRNG.nextInt(120) + 4;
             var10 = var5 + this.hellRNG.nextInt(16) + 8;
-            (new WorldGenFire()).generate(this.worldObj, this.hellRNG, var8, var9, var10);
+            this.fireGenerator.generate(this.worldObj, this.hellRNG, var8, var9, var10);
         }
 
         var6 = this.hellRNG.nextInt(this.hellRNG.nextInt(10) + 1);
+        if (this.lowEndWorldgen)
+        {
+            var6 >>= 1;
+        }
 
         for (var7 = 0; var7 < var6; ++var7)
         {
             var8 = var4 + this.hellRNG.nextInt(16) + 8;
             var9 = this.hellRNG.nextInt(120) + 4;
             var10 = var5 + this.hellRNG.nextInt(16) + 8;
-            (new WorldGenGlowStone1()).generate(this.worldObj, this.hellRNG, var8, var9, var10);
+            this.glowStoneGenerator1.generate(this.worldObj, this.hellRNG, var8, var9, var10);
         }
 
-        for (var7 = 0; var7 < 10; ++var7)
+        for (var7 = 0; var7 < var7GlowStone2Attempts; ++var7)
         {
             var8 = var4 + this.hellRNG.nextInt(16) + 8;
             var9 = this.hellRNG.nextInt(128);
             var10 = var5 + this.hellRNG.nextInt(16) + 8;
-            (new WorldGenGlowStone2()).generate(this.worldObj, this.hellRNG, var8, var9, var10);
+            this.glowStoneGenerator2.generate(this.worldObj, this.hellRNG, var8, var9, var10);
         }
 
-        if (this.hellRNG.nextInt(1) == 0)
+        if (this.hellRNG.nextInt(var8MushroomChance) == 0)
         {
             var7 = var4 + this.hellRNG.nextInt(16) + 8;
             var8 = this.hellRNG.nextInt(128);
             var9 = var5 + this.hellRNG.nextInt(16) + 8;
-            (new WorldGenFlowers(Block.mushroomBrown.blockID)).generate(this.worldObj, this.hellRNG, var7, var8, var9);
+            this.brownMushroomGenerator.generate(this.worldObj, this.hellRNG, var7, var8, var9);
         }
 
-        if (this.hellRNG.nextInt(1) == 0)
+        if (this.hellRNG.nextInt(var8MushroomChance) == 0)
         {
             var7 = var4 + this.hellRNG.nextInt(16) + 8;
             var8 = this.hellRNG.nextInt(128);
             var9 = var5 + this.hellRNG.nextInt(16) + 8;
-            (new WorldGenFlowers(Block.mushroomRed.blockID)).generate(this.worldObj, this.hellRNG, var7, var8, var9);
+            this.redMushroomGenerator.generate(this.worldObj, this.hellRNG, var7, var8, var9);
         }
 
         BlockSand.fallInstantly = false;
