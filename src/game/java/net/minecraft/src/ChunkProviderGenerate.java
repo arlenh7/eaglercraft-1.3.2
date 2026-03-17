@@ -2,6 +2,8 @@ package net.minecraft.src;
 
 import java.util.List;
 import java.util.Random;
+import net.lax1dude.eaglercraft.EagRuntime;
+import net.lax1dude.eaglercraft.internal.EnumPlatformType;
 
 public class ChunkProviderGenerate implements IChunkProvider
 {
@@ -53,6 +55,10 @@ public class ChunkProviderGenerate implements IChunkProvider
 
     /** The biomes that are used to generate the chunk */
     private BiomeGenBase[] biomesForGeneration;
+    private final WorldGenLakes waterLakeGenerator = new WorldGenLakes(Block.waterStill.blockID);
+    private final WorldGenLakes lavaLakeGenerator = new WorldGenLakes(Block.lavaStill.blockID);
+    private final WorldGenDungeons dungeonGenerator = new WorldGenDungeons();
+    private final boolean lowEndWorldgen;
 
     /** A double array that hold terrain noise from noiseGen3 */
     double[] noise3;
@@ -79,6 +85,7 @@ public class ChunkProviderGenerate implements IChunkProvider
     {
         this.worldObj = par1World;
         this.mapFeaturesEnabled = par4;
+        this.lowEndWorldgen = EagRuntime.getPlatformType() != EnumPlatformType.DESKTOP;
         this.rand = new Random(par2);
         this.noiseGen1 = new NoiseGeneratorOctaves(this.rand, 16);
         this.noiseGen2 = new NoiseGeneratorOctaves(this.rand, 16);
@@ -468,6 +475,10 @@ public class ChunkProviderGenerate implements IChunkProvider
         BlockSand.fallInstantly = true;
         int var4 = par2 * 16;
         int var5 = par3 * 16;
+        int var6LakeChance = this.lowEndWorldgen ? 8 : 4;
+        int var7LavaLakeChance = this.lowEndWorldgen ? 16 : 8;
+        int var8DungeonAttempts = this.lowEndWorldgen ? 3 : 8;
+        int var9WeatherStep = this.lowEndWorldgen ? 2 : 1;
         BiomeGenBase var6 = this.worldObj.getBiomeGenForCoords(var4 + 16, var5 + 16);
         this.rand.setSeed(this.worldObj.getSeed());
         long var7 = this.rand.nextLong() / 2L * 2L + 1L;
@@ -487,15 +498,15 @@ public class ChunkProviderGenerate implements IChunkProvider
         int var13;
         int var14;
 
-        if (!var11 && this.rand.nextInt(4) == 0)
+        if (!var11 && this.rand.nextInt(var6LakeChance) == 0)
         {
             var12 = var4 + this.rand.nextInt(16) + 8;
             var13 = this.rand.nextInt(128);
             var14 = var5 + this.rand.nextInt(16) + 8;
-            (new WorldGenLakes(Block.waterStill.blockID)).generate(this.worldObj, this.rand, var12, var13, var14);
+            this.waterLakeGenerator.generate(this.worldObj, this.rand, var12, var13, var14);
         }
 
-        if (!var11 && this.rand.nextInt(8) == 0)
+        if (!var11 && this.rand.nextInt(var7LavaLakeChance) == 0)
         {
             var12 = var4 + this.rand.nextInt(16) + 8;
             var13 = this.rand.nextInt(this.rand.nextInt(120) + 8);
@@ -503,30 +514,35 @@ public class ChunkProviderGenerate implements IChunkProvider
 
             if (var13 < 63 || this.rand.nextInt(10) == 0)
             {
-                (new WorldGenLakes(Block.lavaStill.blockID)).generate(this.worldObj, this.rand, var12, var13, var14);
+                this.lavaLakeGenerator.generate(this.worldObj, this.rand, var12, var13, var14);
             }
         }
 
-        for (var12 = 0; var12 < 8; ++var12)
+        for (var12 = 0; var12 < var8DungeonAttempts; ++var12)
         {
             var13 = var4 + this.rand.nextInt(16) + 8;
             var14 = this.rand.nextInt(128);
             int var15 = var5 + this.rand.nextInt(16) + 8;
 
-            if ((new WorldGenDungeons()).generate(this.worldObj, this.rand, var13, var14, var15))
+            if (this.dungeonGenerator.generate(this.worldObj, this.rand, var13, var14, var15))
             {
                 ;
             }
         }
 
         var6.decorate(this.worldObj, this.rand, var4, var5);
-        SpawnerAnimals.performWorldGenSpawning(this.worldObj, var6, var4 + 8, var5 + 8, 16, 16, this.rand);
+
+        if (!this.lowEndWorldgen || ((par2 + par3) & 1) == 0)
+        {
+            SpawnerAnimals.performWorldGenSpawning(this.worldObj, var6, var4 + 8, var5 + 8, 16, 16, this.rand);
+        }
+
         var4 += 8;
         var5 += 8;
 
-        for (var12 = 0; var12 < 16; ++var12)
+        for (var12 = 0; var12 < 16; var12 += var9WeatherStep)
         {
-            for (var13 = 0; var13 < 16; ++var13)
+            for (var13 = 0; var13 < 16; var13 += var9WeatherStep)
             {
                 var14 = this.worldObj.getPrecipitationHeight(var4 + var12, var5 + var13);
 

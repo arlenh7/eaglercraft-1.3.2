@@ -9,6 +9,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import net.lax1dude.eaglercraft.EagRuntime;
+import net.lax1dude.eaglercraft.internal.EnumPlatformType;
 import net.minecraft.src.AnvilSaveConverter;
 import net.minecraft.src.AxisAlignedBB;
 import net.minecraft.src.CallableIsServerModded;
@@ -142,6 +144,7 @@ public abstract class MinecraftServer implements Runnable, IPlayerUsage, IComman
     private long timeOfLastWarning;
     private String userMessage;
     private boolean startProfiling;
+    private int lastPercentDoneLogged = -1;
 
     public MinecraftServer(File par1File)
     {
@@ -177,6 +180,16 @@ public abstract class MinecraftServer implements Runnable, IPlayerUsage, IComman
     public synchronized String getUserMessage()
     {
         return this.userMessage;
+    }
+
+    public synchronized String getCurrentTask()
+    {
+        return this.currentTask;
+    }
+
+    public synchronized int getPercentDone()
+    {
+        return this.percentDone;
     }
 
     protected void loadAllDimensions(String par1Str, String par2Str, long par3, WorldType par5WorldType)
@@ -250,37 +263,43 @@ public abstract class MinecraftServer implements Runnable, IPlayerUsage, IComman
     protected void initialWorldChunkLoad()
     {
         short var1 = 196;
-        long var2 = System.currentTimeMillis();
-        this.setUserMessage("menu.generatingTerrain");
 
-        for (int var4 = 0; var4 < 1; ++var4)
+        if (this.isSinglePlayer())
         {
-            logger.info("Preparing start region for level " + var4);
-            WorldServer var5 = this.theWorldServer[var4];
-            ChunkCoordinates var6 = var5.getSpawnPoint();
-
-            for (int var7 = -var1; var7 <= var1 && this.isServerRunning(); var7 += 16)
+            if (EagRuntime.getPlatformType() == EnumPlatformType.DESKTOP)
             {
-                for (int var8 = -var1; var8 <= var1 && this.isServerRunning(); var8 += 16)
+                var1 = 128;
+            }
+            else
+            {
+                // Reduce first-load freeze on web/low-end devices.
+                var1 = 48;
+            }
+        }
+
+        this.setUserMessage("menu.generatingTerrain");
+        int var2 = var1 >> 4;
+        int var3 = var2 * 2 + 1;
+        int var4 = var3 * var3;
+
+        for (int var5 = 0; var5 < 1; ++var5)
+        {
+            logger.info("Preparing start region for level " + var5);
+            WorldServer var6 = this.theWorldServer[var5];
+            ChunkCoordinates var7 = var6.getSpawnPoint();
+            int var8 = 0;
+            int var9 = var7.posX >> 4;
+            int var10 = var7.posZ >> 4;
+
+            for (int var11 = -var2; var11 <= var2 && this.isServerRunning(); ++var11)
+            {
+                for (int var12 = -var2; var12 <= var2 && this.isServerRunning(); ++var12)
                 {
-                    long var9 = System.currentTimeMillis();
+                    ++var8;
+                    this.outputPercentRemaining("Preparing spawn area", var8 * 100 / var4);
+                    var6.theChunkProviderServer.loadChunk(var9 + var11, var10 + var12);
 
-                    if (var9 < var2)
-                    {
-                        var2 = var9;
-                    }
-
-                    if (var9 > var2 + 1000L)
-                    {
-                        int var11 = (var1 * 2 + 1) * (var1 * 2 + 1);
-                        int var12 = (var7 + var1) * (var1 * 2 + 1) + var8 + 1;
-                        this.outputPercentRemaining("Preparing spawn area", var12 * 100 / var11);
-                        var2 = var9;
-                    }
-
-                    var5.theChunkProviderServer.loadChunk(var6.posX + var7 >> 4, var6.posZ + var8 >> 4);
-
-                    while (var5.updatingLighting() && this.isServerRunning())
+                    while (var6.updatingLighting() && this.isServerRunning())
                     {
                         ;
                     }
@@ -308,20 +327,35 @@ public abstract class MinecraftServer implements Runnable, IPlayerUsage, IComman
     /**
      * Used to display a percent remaining given text and the percentage.
      */
-    protected void outputPercentRemaining(String par1Str, int par2)
+    protected synchronized void outputPercentRemaining(String par1Str, int par2)
     {
+        if (par2 < 0)
+        {
+            par2 = 0;
+        }
+        else if (par2 > 100)
+        {
+            par2 = 100;
+        }
+
         this.currentTask = par1Str;
         this.percentDone = par2;
-        logger.info(par1Str + ": " + par2 + "%");
+
+        if (this.lastPercentDoneLogged < 0 || par2 == 0 || par2 == 100 || par2 < this.lastPercentDoneLogged || par2 - this.lastPercentDoneLogged >= 5)
+        {
+            logger.info(par1Str + ": " + par2 + "%");
+            this.lastPercentDoneLogged = par2;
+        }
     }
 
     /**
      * Set current task to null and set its percentage to 0.
      */
-    protected void clearCurrentTask()
+    protected synchronized void clearCurrentTask()
     {
         this.currentTask = null;
         this.percentDone = 0;
+        this.lastPercentDoneLogged = -1;
     }
 
     /**

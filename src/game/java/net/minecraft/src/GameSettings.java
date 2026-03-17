@@ -5,6 +5,8 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.PrintWriter;
+import net.lax1dude.eaglercraft.EagRuntime;
+import net.lax1dude.eaglercraft.internal.EnumPlatformType;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.Display;
@@ -125,6 +127,12 @@ public class GameSettings
         this.language = "en_US";
         this.mc = par1Minecraft;
         this.optionsFile = new File(par2File, "options.txt");
+
+        if (!this.optionsFile.exists() && EagRuntime.getPlatformType() != EnumPlatformType.DESKTOP)
+        {
+            this.applyLowEndDefaults();
+        }
+
         this.loadOptions();
     }
 
@@ -147,6 +155,15 @@ public class GameSettings
         this.guiScale = 0;
         this.particleSetting = 0;
         this.language = "en_US";
+    }
+
+    private void applyLowEndDefaults()
+    {
+        this.renderDistance = 2;
+        this.fancyGraphics = false;
+        this.ambientOcclusion = false;
+        this.clouds = false;
+        this.particleSetting = 1;
     }
 
 

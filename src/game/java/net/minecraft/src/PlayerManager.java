@@ -1,6 +1,7 @@
 package net.minecraft.src;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 
@@ -113,7 +114,7 @@ public class PlayerManager
 
     public void func_72691_b(EntityPlayerMP par1EntityPlayerMP)
     {
-        ArrayList var2 = new ArrayList(par1EntityPlayerMP.chunksToLoad);
+        HashSet var2 = new HashSet(par1EntityPlayerMP.chunksToLoad);
         int var3 = 0;
         int var4 = this.playerViewDistance;
         int var5 = (int)par1EntityPlayerMP.posX >> 4;

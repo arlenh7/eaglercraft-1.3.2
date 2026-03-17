@@ -51,11 +51,13 @@ import net.minecraft.src.GameSettings;
 import net.minecraft.src.GuiAchievement;
 import net.minecraft.src.GuiChat;
 import net.minecraft.src.GuiConnecting;
+import net.minecraft.src.GuiDisconnected;
 import net.minecraft.src.GuiErrorScreen;
 import net.minecraft.src.GuiGameOver;
 import net.minecraft.src.GuiIngame;
 import net.minecraft.src.GuiIngameMenu;
 import net.minecraft.src.GuiInventory;
+import net.minecraft.src.GuiJoiningWorld;
 import net.minecraft.src.GuiMainMenu;
 import net.minecraft.src.GuiMemoryErrorScreen;
 import net.minecraft.src.GuiScreen;
@@ -1536,33 +1538,80 @@ public class Minecraft implements Runnable, IPlayerUsage
         this.theIntegratedServer.startServerThread();
         this.integratedServerIsRunning = true;
         this.loadingScreen.displayProgressMessage(StatCollector.translateToLocal("menu.loadingLevel"));
+        long var6 = getSystemTime();
+        String var7 = null;
+        String var8 = null;
+        int var9 = Integer.MIN_VALUE;
 
         while (!this.theIntegratedServer.serverIsInRunLoop())
         {
-            String var6 = this.theIntegratedServer.getUserMessage();
-
-            if (var6 != null)
+            if (this.theIntegratedServer.isServerStopped())
             {
-                this.loadingScreen.resetProgresAndWorkingMessage(StatCollector.translateToLocal(var6));
-            }
-            else
-            {
-                this.loadingScreen.resetProgresAndWorkingMessage("");
+                this.integratedServerIsRunning = false;
+                this.theIntegratedServer = null;
+                this.displayGuiScreen(new GuiDisconnected("connect.failed", "disconnect.genericReason", new Object[] {"Integrated server failed to start"}));
+                return;
             }
 
-            EagUtils.sleep(200L);
+            if (getSystemTime() - var6 > 120000L)
+            {
+                this.theIntegratedServer.setServerStopping();
+                this.integratedServerIsRunning = false;
+                this.theIntegratedServer = null;
+                this.displayGuiScreen(new GuiDisconnected("connect.failed", "disconnect.genericReason", new Object[] {"Timed out while starting integrated server"}));
+                return;
+            }
+
+            String var10 = this.theIntegratedServer.getUserMessage();
+            String var11 = var10 != null ? StatCollector.translateToLocal(var10) : "";
+
+            if (!var11.equals(var7))
+            {
+                this.loadingScreen.displayProgressMessage(var11);
+                var7 = var11;
+            }
+
+            String var12 = this.theIntegratedServer.getCurrentTask();
+            String var13 = var12 != null ? var12 : "";
+
+            if (!var13.equals(var8))
+            {
+                this.loadingScreen.resetProgresAndWorkingMessage(var13);
+                var8 = var13;
+                var9 = Integer.MIN_VALUE;
+            }
+
+            int var14 = var12 != null ? this.theIntegratedServer.getPercentDone() : -1;
+
+            if (var14 < -1)
+            {
+                var14 = -1;
+            }
+            else if (var14 > 100)
+            {
+                var14 = 100;
+            }
+
+            if (var14 != var9)
+            {
+                this.loadingScreen.setLoadingProgress(var14);
+                var9 = var14;
+            }
+
+            EagUtils.sleep(25L);
         }
-
-        this.displayGuiScreen((GuiScreen)null);
 
         try
         {
-            NetClientHandler var10 = new NetClientHandler(this, this.theIntegratedServer);
-            this.myNetworkManager = var10.getNetManager();
+            NetClientHandler var15 = new NetClientHandler(this, this.theIntegratedServer);
+            this.myNetworkManager = var15.getNetManager();
+            this.displayGuiScreen(new GuiJoiningWorld(var15));
         }
-        catch (IOException var8)
+        catch (IOException var16)
         {
-            this.displayCrashReport(this.func_71396_d(new CrashReport("Connecting to integrated server", var8)));
+            this.integratedServerIsRunning = false;
+            this.theIntegratedServer = null;
+            this.displayGuiScreen(new GuiDisconnected("connect.failed", "disconnect.genericReason", new Object[] {var16.toString()}));
         }
     }
 

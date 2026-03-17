@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
+import net.lax1dude.eaglercraft.EagRuntime;
+import net.lax1dude.eaglercraft.internal.EnumPlatformType;
 import net.minecraft.server.MinecraftServer;
 
 public class WorldServer extends World
@@ -44,6 +46,11 @@ public class WorldServer extends World
      */
     private int blockEventCacheIndex = 0;
     private static final WeightedRandomChestContent[] bonusChestContent = new WeightedRandomChestContent[] {new WeightedRandomChestContent(Item.stick.shiftedIndex, 0, 1, 3, 10), new WeightedRandomChestContent(Block.planks.blockID, 0, 1, 3, 10), new WeightedRandomChestContent(Block.wood.blockID, 0, 1, 3, 10), new WeightedRandomChestContent(Item.axeStone.shiftedIndex, 0, 1, 1, 3), new WeightedRandomChestContent(Item.axeWood.shiftedIndex, 0, 1, 1, 5), new WeightedRandomChestContent(Item.pickaxeStone.shiftedIndex, 0, 1, 1, 3), new WeightedRandomChestContent(Item.pickaxeWood.shiftedIndex, 0, 1, 1, 5), new WeightedRandomChestContent(Item.appleRed.shiftedIndex, 0, 2, 3, 5), new WeightedRandomChestContent(Item.bread.shiftedIndex, 0, 2, 3, 3)};
+    private final boolean lowEndRuntime;
+    private final int hostileSpawnIntervalTicks;
+    private final int passiveSpawnIntervalTicks;
+    private final int randomTicksPerChunkSection;
+    private final int iceAndSnowChance;
 
     /** An IntHashMap of entity IDs (integers) to their Entity objects. */
     private IntHashMap entityIdMap;
@@ -52,6 +59,11 @@ public class WorldServer extends World
     {
         super(par2ISaveHandler, par3Str, par5WorldSettings, WorldProvider.getProviderForDimension(par4), par6Profiler);
         this.mcServer = par1MinecraftServer;
+        this.lowEndRuntime = EagRuntime.getPlatformType() != EnumPlatformType.DESKTOP;
+        this.hostileSpawnIntervalTicks = this.lowEndRuntime ? 2 : 1;
+        this.passiveSpawnIntervalTicks = this.lowEndRuntime ? 800 : 400;
+        this.randomTicksPerChunkSection = this.lowEndRuntime ? 2 : 3;
+        this.iceAndSnowChance = this.lowEndRuntime ? 24 : 16;
         this.theEntityTracker = new EntityTracker(this);
         this.thePlayerManager = new PlayerManager(this, par1MinecraftServer.getConfigurationManager().getViewDistance());
 
@@ -103,7 +115,12 @@ public class WorldServer extends World
         }
 
         this.theProfiler.startSection("mobSpawner");
-        SpawnerAnimals.findChunksForSpawning(this, this.spawnHostileMobs, this.spawnPeacefulMobs && this.worldInfo.getWorldTime() % 400L == 0L);
+
+        if (this.worldInfo.getWorldTime() % (long)this.hostileSpawnIntervalTicks == 0L)
+        {
+            SpawnerAnimals.findChunksForSpawning(this, this.spawnHostileMobs, this.spawnPeacefulMobs && this.worldInfo.getWorldTime() % (long)this.passiveSpawnIntervalTicks == 0L);
+        }
+
         this.theProfiler.endStartSection("chunkSource");
         this.chunkProvider.unload100OldestChunks();
         int var4 = this.calculateSkylightSubtracted(1.0F);
@@ -284,7 +301,7 @@ public class WorldServer extends World
             this.theProfiler.endStartSection("iceandsnow");
             int var13;
 
-            if (this.rand.nextInt(16) == 0)
+            if (this.rand.nextInt(this.iceAndSnowChance) == 0)
             {
                 this.updateLCG = this.updateLCG * 3 + 1013904223;
                 var8 = this.updateLCG >> 2;
@@ -328,7 +345,7 @@ public class WorldServer extends World
 
                 if (var21 != null && var21.getNeedsRandomTick())
                 {
-                    for (int var20 = 0; var20 < 3; ++var20)
+                    for (int var20 = 0; var20 < this.randomTicksPerChunkSection; ++var20)
                     {
                         this.updateLCG = this.updateLCG * 3 + 1013904223;
                         var13 = this.updateLCG >> 2;
