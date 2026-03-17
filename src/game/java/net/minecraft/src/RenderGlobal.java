@@ -18,7 +18,7 @@ import org.lwjgl.opengl.GL11;
 
 public class RenderGlobal implements IWorldAccess
 {
-    private static final boolean DISABLE_TERRAIN_LIGHTMAP = true;
+    private static final boolean DISABLE_TERRAIN_LIGHTMAP = false;
     // Limit chunk rebuild work per frame to keep FPS stable on WebGL
     private static final int MAX_NEAR_CHUNK_UPDATES_PER_CALL = 2;
     private static final int MAX_FAR_CHUNK_UPDATES_PER_CALL = 2;
@@ -2010,7 +2010,29 @@ public class RenderGlobal implements IWorldAccess
     /**
      * Plays the specified sound. Arg: soundName, x, y, z, volume, pitch
      */
-    public void playSound(String par1Str, double par2, double par4, double par6, float par8, float par9) {}
+    public void playSound(String par1Str, double par2, double par4, double par6, float par8, float par9)
+    {
+        if (this.mc == null || this.mc.sndManager == null || this.mc.renderViewEntity == null)
+        {
+            return;
+        }
+
+        float var10 = 16.0F;
+
+        if (par8 > 1.0F)
+        {
+            var10 *= par8;
+        }
+
+        double var11 = this.mc.renderViewEntity.posX - par2;
+        double var13 = this.mc.renderViewEntity.posY - par4;
+        double var15 = this.mc.renderViewEntity.posZ - par6;
+
+        if (var11 * var11 + var13 * var13 + var15 * var15 < (double)(var10 * var10))
+        {
+            this.mc.sndManager.playSound(par1Str, (float)par2, (float)par4, (float)par6, par8, par9);
+        }
+    }
 
     /**
      * Spawns a particle. Arg: particleType, x, y, z, velX, velY, velZ

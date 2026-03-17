@@ -186,7 +186,7 @@ public class GuiMainMenu extends GuiScreen
             this.func_73969_a(var4, 24, var2);
         }
 
-        this.controlList.add(new GuiButton(3, this.width / 2 - 100, var4 + 48, var2.translateKey("menu.mods")));
+        this.controlList.add(new GuiButton(3, this.width / 2 - 100, var4 + 48, "Fork on Github"));
 
         this.controlList.add(new GuiButton(0, this.width / 2 - 100, var4 + 72 + 12, 98, 20, var2.translateKey("menu.options")));
         this.controlList.add(new GuiButton(4, this.width / 2 + 2, var4 + 72 + 12, 98, 20, "Edit Profile"));
@@ -305,7 +305,7 @@ public class GuiMainMenu extends GuiScreen
 
         if (par1GuiButton.id == 3)
         {
-            this.mc.displayGuiScreen(new GuiTexturePacks(this));
+            EagRuntime.openLink("https://github.com/arlenh7/eaglercraft-1.3.2");
         }
 
         if (par1GuiButton.id == 4)
@@ -606,12 +606,12 @@ public class GuiMainMenu extends GuiScreen
             var9 = var9 + " Demo";
         }
 
-        this.drawString(this.fontRenderer, var9, 2, this.height - 10, 16777215);
+        this.drawString(this.fontRenderer, var9, 2, this.height - 20, 16777215);
+        this.drawString(this.fontRenderer, "Eaglercraft 1.3.2-u1 [" + EagRuntime.getPlatformType() + "]", 2, this.height - 10, 16777215);
         String var10 = "Copyright Mojang AB. Do not distribute!";
         this.drawString(this.fontRenderer, var10, this.width - this.fontRenderer.getStringWidth(var10) - 2, this.height - 10, 16777215);
 
-        // top-right "eaglercraft readme.txt" label (original style)
-        String readmeLabel = "eaglercraft readme.txt";
+        String readmeLabel = "Made by arlen";
         int labelW = this.fontRenderer.getStringWidth(readmeLabel) * 3 / 4;
         int labelX = this.width - labelW - 4;
         if (!this.showReadme && this.isReadmeHover(par1, par2))
@@ -693,7 +693,7 @@ public class GuiMainMenu extends GuiScreen
 
     private boolean isReadmeHover(int x, int y)
     {
-        String readmeLabel = "eaglercraft readme.txt";
+        String readmeLabel = "Made by arlen";
         int labelW = this.fontRenderer.getStringWidth(readmeLabel) * 3 / 4;
         int labelX = this.width - labelW - 4;
         return x >= labelX && x <= this.width && y >= 0 && y <= 9;

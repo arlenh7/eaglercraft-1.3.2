@@ -28,6 +28,7 @@ public class GuiScreenEditProfile extends GuiScreen {
 	private final GuiScreen parent;
 	private GuiTextField usernameField;
 	private GuiButton doneButton;
+	private String screenTitle = "Edit Profile";
 
 	public GuiScreenEditProfile(GuiScreen parent) {
 		this.parent = parent;
@@ -38,18 +39,14 @@ public class GuiScreenEditProfile extends GuiScreen {
 		StringTranslate tr = StringTranslate.getInstance();
 
 		this.controlList.clear();
-		this.doneButton = new GuiButton(0, this.width / 2 - 100, this.height / 4 + 96 + 12,
-				tr.translateKey("gui.done"));
+		this.doneButton = new GuiButton(0, this.width / 2 - 100, this.height / 6 + 168, tr.translateKey("gui.done"));
 		this.controlList.add(this.doneButton);
-		this.controlList.add(new GuiButton(1, this.width / 2 - 100, this.height / 4 + 120 + 12,
-				tr.translateKey("gui.cancel")));
 
-		this.usernameField = new GuiTextField(this.fontRenderer, this.width / 2 - 100, 60, 200, 20);
+		this.usernameField = new GuiTextField(this.fontRenderer, this.width / 2 - 20 + 1, this.height / 6 + 24 + 1, 138, 20);
 		this.usernameField.setFocused(true);
 		String currentName = EaglerProfile.getName();
-		this.usernameField.setText(currentName == null ? "" : currentName);
+		this.usernameField.setText(sanitizeForEdit(currentName == null ? "" : currentName));
 		this.usernameField.setMaxStringLength(16);
-		updateDoneEnabled();
 	}
 
 	public void updateScreen() {
@@ -62,14 +59,21 @@ public class GuiScreenEditProfile extends GuiScreen {
 
 	protected void keyTyped(char par1, int par2) {
 		this.usernameField.textboxKeyTyped(par1, par2);
-		updateDoneEnabled();
+		int cursor = this.usernameField.getCursorPosition();
+		String originalText = this.usernameField.getText();
+		String text = sanitizeForEdit(originalText);
+		if (!text.equals(originalText)) {
+			this.usernameField.setText(text);
+			this.usernameField.setCursorPosition(Math.min(cursor, text.length()));
+		}
 
-		if (par1 == 13) {
+		if (par2 == 28 || par1 == 13) {
 			this.actionPerformed(this.doneButton);
 			return;
 		}
 		if (par2 == 1) {
-			this.actionPerformed((GuiButton)this.controlList.get(1));
+			markProfileSeen();
+			this.mc.displayGuiScreen(this.parent);
 		}
 	}
 
@@ -85,28 +89,25 @@ public class GuiScreenEditProfile extends GuiScreen {
 		if (par1GuiButton.id == 0) {
 			saveProfile();
 			this.mc.displayGuiScreen(this.parent);
-		} else if (par1GuiButton.id == 1) {
-			markProfileSeen();
-			this.mc.displayGuiScreen(this.parent);
 		}
 	}
 
 	public void drawScreen(int par1, int par2, float par3) {
 		this.drawDefaultBackground();
-		this.drawCenteredString(this.fontRenderer, "Edit Profile", this.width / 2, this.height / 4 - 60 + 20, 16777215);
-		this.drawString(this.fontRenderer, "Username", this.width / 2 - 100, 47, 10526880);
+		this.drawCenteredString(this.fontRenderer, this.screenTitle, this.width / 2, 15, 16777215);
+		this.drawString(this.fontRenderer, "Username", this.width / 2 - 20, this.height / 6 + 8, 10526880);
 		this.usernameField.drawTextBox();
 		super.drawScreen(par1, par2, par3);
 	}
 
-	private void updateDoneEnabled() {
-		if (this.doneButton != null) {
-			this.doneButton.enabled = this.usernameField.getText().trim().length() > 0;
-		}
-	}
-
 	private void saveProfile() {
-		String name = sanitizeName(this.usernameField.getText());
+		String name = this.usernameField.getText().trim();
+		while (name.length() < 3) {
+			name = name + "_";
+		}
+		if (name.length() > 16) {
+			name = name.substring(0, 16);
+		}
 		EaglerProfile.setName(name);
 		EaglerProfile.save();
 		markProfileSeen();
@@ -116,14 +117,11 @@ public class GuiScreenEditProfile extends GuiScreen {
 		EagRuntime.setStorage("profileSeen", new byte[] { 1 });
 	}
 
-	private static String sanitizeName(String name) {
+	private static String sanitizeForEdit(String name) {
 		if (name == null) {
 			name = "";
 		}
 		name = name.trim().replaceAll("[^A-Za-z0-9]", "_");
-		while (name.length() < 3) {
-			name = name + "_";
-		}
 		if (name.length() > 16) {
 			name = name.substring(0, 16);
 		}

@@ -1173,7 +1173,7 @@ public class Minecraft implements Runnable, IPlayerUsage
                 this.displayGuiScreen(new GuiSleepMP());
             }
         }
-        else if (this.currentScreen != null && this.currentScreen instanceof GuiSleepMP && !this.thePlayer.isPlayerSleeping())
+        else if (this.currentScreen != null && this.currentScreen instanceof GuiSleepMP && this.thePlayer != null && !this.thePlayer.isPlayerSleeping())
         {
             this.displayGuiScreen((GuiScreen)null);
         }
@@ -1213,7 +1213,7 @@ public class Minecraft implements Runnable, IPlayerUsage
                 {
                     int var3 = Mouse.getEventDWheel();
 
-                    if (var3 != 0)
+                    if (var3 != 0 && this.thePlayer != null && this.theWorld != null)
                     {
                         this.thePlayer.inventory.changeCurrentItem(var3);
 
@@ -1264,6 +1264,20 @@ public class Minecraft implements Runnable, IPlayerUsage
                     KeyBinding.onTick(Keyboard.getEventKey());
                 }
 
+                if (Keyboard.getEventKey() == 61 && this.thePlayer != null && this.theWorld != null)
+                {
+                    if (Keyboard.getEventKeyState())
+                    {
+                        this.gameSettings.showDebugInfo = true;
+                        this.gameSettings.field_74329_Q = !GuiScreen.isShiftKeyDown();
+                    }
+                    else
+                    {
+                        this.gameSettings.showDebugInfo = false;
+                        this.gameSettings.field_74329_Q = false;
+                    }
+                }
+
                 if (Keyboard.getEventKeyState())
                 {
                         if (this.currentScreen != null)
@@ -1303,12 +1317,6 @@ public class Minecraft implements Runnable, IPlayerUsage
                                 this.gameSettings.hideGUI = !this.gameSettings.hideGUI;
                             }
 
-                            if (Keyboard.getEventKey() == 61)
-                            {
-                                this.gameSettings.showDebugInfo = !this.gameSettings.showDebugInfo;
-                                this.gameSettings.field_74329_Q = !GuiScreen.isShiftKeyDown();
-                            }
-
                             if (Keyboard.getEventKey() == 63)
                             {
                                 ++this.gameSettings.thirdPersonView;
@@ -1325,110 +1333,116 @@ public class Minecraft implements Runnable, IPlayerUsage
                             }
                         }
 
-                        int var5;
-
-                        for (var5 = 0; var5 < 9; ++var5)
+                        if (this.thePlayer != null && this.theWorld != null)
                         {
-                            if (Keyboard.getEventKey() == 2 + var5)
-                            {
-                                this.thePlayer.inventory.currentItem = var5;
-                            }
-                        }
-
-                        if (this.gameSettings.showDebugInfo && this.gameSettings.field_74329_Q)
-                        {
-                            if (Keyboard.getEventKey() == 11)
-                            {
-                                this.updateDebugProfilerName(0);
-                            }
+                            int var5;
 
                             for (var5 = 0; var5 < 9; ++var5)
                             {
                                 if (Keyboard.getEventKey() == 2 + var5)
                                 {
-                                    this.updateDebugProfilerName(var5 + 1);
+                                    this.thePlayer.inventory.currentItem = var5;
+                                }
+                            }
+
+                            if (this.gameSettings.showDebugInfo && this.gameSettings.field_74329_Q)
+                            {
+                                if (Keyboard.getEventKey() == 11)
+                                {
+                                    this.updateDebugProfilerName(0);
+                                }
+
+                                for (var5 = 0; var5 < 9; ++var5)
+                                {
+                                    if (Keyboard.getEventKey() == 2 + var5)
+                                    {
+                                        this.updateDebugProfilerName(var5 + 1);
+                                    }
                                 }
                             }
                         }
                 }
             }
 
-            var4 = this.gameSettings.chatVisibility != 2;
-
-            while (this.gameSettings.keyBindInventory.isPressed())
+            if (this.thePlayer != null && this.theWorld != null)
             {
-                this.displayGuiScreen(new GuiInventory(this.thePlayer));
-            }
+                var4 = this.gameSettings.chatVisibility != 2;
 
-            while (this.gameSettings.keyBindDrop.isPressed())
-            {
-                this.thePlayer.dropOneItem();
-            }
-
-            while (this.gameSettings.keyBindChat.isPressed() && var4)
-            {
-                this.displayGuiScreen(new GuiChat());
-            }
-
-            if (this.currentScreen == null && this.gameSettings.field_74323_J.isPressed() && var4)
-            {
-                this.displayGuiScreen(new GuiChat("/"));
-            }
-
-            if (this.thePlayer.isUsingItem())
-            {
-                if (!this.gameSettings.keyBindUseItem.pressed)
+                while (this.gameSettings.keyBindInventory.isPressed())
                 {
-                    this.playerController.onStoppedUsingItem(this.thePlayer);
+                    this.displayGuiScreen(new GuiInventory(this.thePlayer));
                 }
 
-                label309:
-
-                while (true)
+                while (this.gameSettings.keyBindDrop.isPressed())
                 {
-                    if (!this.gameSettings.keyBindAttack.isPressed())
-                    {
-                        while (this.gameSettings.keyBindUseItem.isPressed())
-                        {
-                            ;
-                        }
+                    this.thePlayer.dropOneItem();
+                }
 
-                        while (true)
+                while (this.gameSettings.keyBindChat.isPressed() && var4)
+                {
+                    this.displayGuiScreen(new GuiChat());
+                }
+
+                if (this.currentScreen == null && this.gameSettings.field_74323_J.isPressed() && var4)
+                {
+                    this.displayGuiScreen(new GuiChat("/"));
+                }
+
+                if (this.thePlayer.isUsingItem())
+                {
+                    if (!this.gameSettings.keyBindUseItem.pressed)
+                    {
+                        this.playerController.onStoppedUsingItem(this.thePlayer);
+                    }
+
+                    label309:
+
+                    while (true)
+                    {
+                        if (!this.gameSettings.keyBindAttack.isPressed())
                         {
-                            if (this.gameSettings.keyBindPickBlock.isPressed())
+                            while (this.gameSettings.keyBindUseItem.isPressed())
                             {
-                                continue;
+                                ;
                             }
 
-                            break label309;
+                            while (true)
+                            {
+                                if (this.gameSettings.keyBindPickBlock.isPressed())
+                                {
+                                    continue;
+                                }
+
+                                break label309;
+                            }
                         }
                     }
                 }
-            }
-            else
-            {
-                while (this.gameSettings.keyBindAttack.isPressed())
+                else
                 {
-                    this.clickMouse(0);
+                    while (this.gameSettings.keyBindAttack.isPressed())
+                    {
+                        this.clickMouse(0);
+                    }
+
+                    while (this.gameSettings.keyBindUseItem.isPressed())
+                    {
+                        this.clickMouse(1);
+                    }
+
+                    while (this.gameSettings.keyBindPickBlock.isPressed())
+                    {
+                        this.clickMiddleMouseButton();
+                    }
                 }
 
-                while (this.gameSettings.keyBindUseItem.isPressed())
+                if (this.gameSettings.keyBindUseItem.pressed && this.rightClickDelayTimer == 0 && !this.thePlayer.isUsingItem())
                 {
                     this.clickMouse(1);
                 }
 
-                while (this.gameSettings.keyBindPickBlock.isPressed())
-                {
-                    this.clickMiddleMouseButton();
-                }
+                this.sendClickBlockToController(0, this.currentScreen == null && this.gameSettings.keyBindAttack.pressed && this.inGameHasFocus);
             }
-
-            if (this.gameSettings.keyBindUseItem.pressed && this.rightClickDelayTimer == 0 && !this.thePlayer.isUsingItem())
-            {
-                this.clickMouse(1);
-            }
-
-            this.sendClickBlockToController(0, this.currentScreen == null && this.gameSettings.keyBindAttack.pressed && this.inGameHasFocus);
         }
 
         if (this.theWorld != null)
@@ -1478,7 +1492,7 @@ public class Minecraft implements Runnable, IPlayerUsage
 
             this.mcProfiler.endStartSection("animateTick");
 
-            if (!this.isGamePaused && this.theWorld != null)
+            if (!this.isGamePaused && this.theWorld != null && this.thePlayer != null)
             {
                 this.theWorld.func_73029_E(MathHelper.floor_double(this.thePlayer.posX), MathHelper.floor_double(this.thePlayer.posY), MathHelper.floor_double(this.thePlayer.posZ));
             }
@@ -1720,7 +1734,7 @@ public class Minecraft implements Runnable, IPlayerUsage
      */
     public String debugInfoRenders()
     {
-        return this.renderGlobal.getDebugInfoRenders();
+        return this.renderGlobal != null ? this.renderGlobal.getDebugInfoRenders() : "C: ?/?. F: ?, O: ?, E: ?";
     }
 
     /**
@@ -1728,7 +1742,7 @@ public class Minecraft implements Runnable, IPlayerUsage
      */
     public String getEntityDebug()
     {
-        return this.renderGlobal.getDebugInfoEntities();
+        return this.renderGlobal != null ? this.renderGlobal.getDebugInfoEntities() : "E: ?/?. B: ?, I: ?";
     }
 
     /**
@@ -1736,7 +1750,7 @@ public class Minecraft implements Runnable, IPlayerUsage
      */
     public String getWorldProviderName()
     {
-        return this.theWorld.getProviderName();
+        return this.theWorld != null ? this.theWorld.getProviderName() : "Unknown";
     }
 
     /**
@@ -1744,6 +1758,11 @@ public class Minecraft implements Runnable, IPlayerUsage
      */
     public String debugInfoEntities()
     {
+        if (this.effectRenderer == null || this.theWorld == null)
+        {
+            return "P: ?. T: ?";
+        }
+
         return "P: " + this.effectRenderer.getStatistics() + ". T: " + this.theWorld.getDebugLoadedEntities();
     }
 

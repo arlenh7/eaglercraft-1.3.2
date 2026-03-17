@@ -1,5 +1,7 @@
 package net.minecraft.src;
 
+import net.lax1dude.eaglercraft.EagRuntime;
+
 public class BlockJukeBox extends BlockContainer
 {
     protected BlockJukeBox(int par1, int par2)

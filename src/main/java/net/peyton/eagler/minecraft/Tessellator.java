@@ -5,9 +5,7 @@ import net.lax1dude.eaglercraft.opengl.WorldVertexBufferUploader;
 
 public class Tessellator {
 
-	// TEMP: disable lightmap path to avoid black/invisible world rendering if lightmap coords are broken
-	// Flip to true once lightmap pipeline is confirmed working.
-	private static final boolean ENABLE_LIGHTMAP = false;
+	private static final boolean ENABLE_LIGHTMAP = true;
 	
 	private net.lax1dude.eaglercraft.opengl.WorldRenderer worldRenderer;
 	public static final Tessellator instance = new Tessellator(524288);
@@ -107,14 +105,18 @@ public class Tessellator {
 	}
 
 	public void setBrightness(int brightness) {
-		if(!ENABLE_LIGHTMAP) {
-			return;
-		}
 		if(!this.worldRenderer.needsUpdate) {
-			this.format.setLightmap();
 			this.lightmapU = brightness & 65535;
 			this.lightmapV = brightness >>> 16;
-			this.explicitLightmap = true;
+			if(this.renderingChunk && ENABLE_LIGHTMAP) {
+				this.format.setLightmap();
+				this.explicitLightmap = true;
+			}else {
+				// Non-chunk rendering still uses the global lightmap coordinates path
+				net.minecraft.src.OpenGlHelper.setLightmapTextureCoords(
+						net.minecraft.src.OpenGlHelper.lightmapTexUnit, this.lightmapU, this.lightmapV);
+				this.explicitLightmap = false;
+			}
 		}
 	}
 

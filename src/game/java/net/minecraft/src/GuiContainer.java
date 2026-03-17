@@ -1,8 +1,11 @@
 package net.minecraft.src;
 
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import org.lwjgl.input.Keyboard;
+import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
 
@@ -29,6 +32,11 @@ public abstract class GuiContainer extends GuiScreen
      * Starting Y position for the Gui. Inconsistent use for Gui backgrounds.
      */
     protected int guiTop;
+    private boolean isDragSplitting = false;
+    private int dragSplittingButton = -1;
+    private boolean dragSplittingMoved = false;
+    private Slot dragSplittingStartSlot = null;
+    private final LinkedHashSet<Slot> dragSplittingSlots = new LinkedHashSet<Slot>();
 
     public GuiContainer(Container par1Container)
     {
@@ -295,6 +303,13 @@ public abstract class GuiContainer extends GuiScreen
         if (par3 == 0 || par3 == 1)
         {
             Slot var4 = this.getSlotAtPosition(par1, par2);
+
+            if (this.mc.thePlayer != null && this.mc.thePlayer.inventory.getItemStack() != null && var4 != null)
+            {
+                this.beginDragSplitting(par3, var4);
+                return;
+            }
+
             int var5 = this.guiLeft;
             int var6 = this.guiTop;
             boolean var7 = par1 < var5 || par2 < var6 || par1 >= var5 + this.xSize || par2 >= var6 + this.ySize;
@@ -316,6 +331,29 @@ public abstract class GuiContainer extends GuiScreen
                 this.handleMouseClick(var4, var8, par3, var9);
             }
         }
+    }
+
+    protected void mouseMovedOrUp(int par1, int par2, int par3)
+    {
+        if (this.isDragSplitting)
+        {
+            if (par3 == -1)
+            {
+                if ((this.dragSplittingButton == 0 && Mouse.isButtonDown(0)) || (this.dragSplittingButton == 1 && Mouse.isButtonDown(1)))
+                {
+                    this.addDragSplittingSlot(par1, par2);
+                    return;
+                }
+            }
+
+            if (par3 == this.dragSplittingButton)
+            {
+                this.finishDragSplitting();
+                return;
+            }
+        }
+
+        super.mouseMovedOrUp(par1, par2, par3);
     }
 
     /**
@@ -343,6 +381,146 @@ public abstract class GuiContainer extends GuiScreen
         }
 
         this.mc.playerController.windowClick(this.inventorySlots.windowId, par2, par3, par4, this.mc.thePlayer);
+    }
+
+    private void beginDragSplitting(int par1, Slot par2Slot)
+    {
+        this.isDragSplitting = true;
+        this.dragSplittingButton = par1;
+        this.dragSplittingMoved = false;
+        this.dragSplittingStartSlot = par2Slot;
+        this.dragSplittingSlots.clear();
+        this.dragSplittingSlots.add(par2Slot);
+
+        if (par1 == 1)
+        {
+            this.handleMouseClick(par2Slot, par2Slot.slotNumber, 1, false);
+        }
+    }
+
+    private void addDragSplittingSlot(int par1, int par2)
+    {
+        Slot var3 = this.getSlotAtPosition(par1, par2);
+
+        if (var3 != null && !this.dragSplittingSlots.contains(var3))
+        {
+            this.dragSplittingSlots.add(var3);
+            this.dragSplittingMoved = true;
+
+            if (this.dragSplittingButton == 1)
+            {
+                this.handleMouseClick(var3, var3.slotNumber, 1, false);
+            }
+        }
+    }
+
+    private void finishDragSplitting()
+    {
+        try
+        {
+            if (this.dragSplittingButton == 0)
+            {
+                if (!this.dragSplittingMoved || this.dragSplittingSlots.size() <= 1)
+                {
+                    if (this.dragSplittingStartSlot != null)
+                    {
+                        this.handleMouseClick(this.dragSplittingStartSlot, this.dragSplittingStartSlot.slotNumber, 0, false);
+                    }
+                }
+                else
+                {
+                    this.distributeDraggedStack();
+                }
+            }
+        }
+        finally
+        {
+            this.isDragSplitting = false;
+            this.dragSplittingButton = -1;
+            this.dragSplittingMoved = false;
+            this.dragSplittingStartSlot = null;
+            this.dragSplittingSlots.clear();
+        }
+    }
+
+    private void distributeDraggedStack()
+    {
+        ItemStack var1 = this.mc.thePlayer.inventory.getItemStack();
+
+        if (var1 == null || var1.stackSize <= 0)
+        {
+            return;
+        }
+
+        ArrayList<Slot> var2 = new ArrayList<Slot>(this.dragSplittingSlots.size());
+        Iterator<Slot> var3 = this.dragSplittingSlots.iterator();
+
+        while (var3.hasNext())
+        {
+            Slot var4 = (Slot)var3.next();
+
+            if (this.canAddItemToSlot(var4, var1))
+            {
+                var2.add(var4);
+            }
+        }
+
+        int var9 = var2.size();
+
+        if (var9 <= 0)
+        {
+            return;
+        }
+
+        int var10 = var1.stackSize;
+        int var11 = var10 / var9;
+        int var12 = var10 % var9;
+
+        for (int var5 = 0; var5 < var9; ++var5)
+        {
+            Slot var6 = (Slot)var2.get(var5);
+            int var7 = var11 + (var5 < var12 ? 1 : 0);
+
+            for (int var8 = 0; var8 < var7; ++var8)
+            {
+                ItemStack var13 = this.mc.thePlayer.inventory.getItemStack();
+
+                if (var13 == null || var13.stackSize <= 0)
+                {
+                    return;
+                }
+
+                if (!this.canAddItemToSlot(var6, var13))
+                {
+                    break;
+                }
+
+                this.handleMouseClick(var6, var6.slotNumber, 1, false);
+            }
+        }
+    }
+
+    private boolean canAddItemToSlot(Slot par1Slot, ItemStack par2ItemStack)
+    {
+        if (par1Slot == null || par2ItemStack == null || !par1Slot.isItemValid(par2ItemStack))
+        {
+            return false;
+        }
+
+        ItemStack var3 = par1Slot.getStack();
+
+        if (var3 == null)
+        {
+            return true;
+        }
+
+        if (!var3.isItemEqual(par2ItemStack) || !ItemStack.func_77970_a(var3, par2ItemStack))
+        {
+            return false;
+        }
+
+        int var4 = Math.min(par1Slot.getSlotStackLimit(), par2ItemStack.getMaxStackSize());
+        return var3.stackSize < var4;
     }
 
     /**
